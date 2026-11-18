@@ -9,7 +9,7 @@ import { apiUser } from "@/lib/auth";
  * POST — manual grant { userId, courseId }
  */
 export async function GET() {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const [requests, enrollments] = await Promise.all([
     db.enrollmentRequest.findMany({
@@ -27,7 +27,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const { requestId, action } = (await req.json().catch(() => ({}))) as { requestId?: string; action?: string };
   if (!requestId || !action) return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
@@ -59,7 +59,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const { userId, courseId } = (await req.json().catch(() => ({}))) as { userId?: string; courseId?: string };
   if (!userId || !courseId) return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });

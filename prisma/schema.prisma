@@ -11,7 +11,8 @@ datasource db {
 // ---------- Users, Sessions & Security ----------
 
 enum Role {
-  ADMIN
+  ADMIN // platform owner
+  TEACHER // the single Quran teacher
   STUDENT
 }
 

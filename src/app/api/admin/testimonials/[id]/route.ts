@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -18,7 +18,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const { id } = await params;
   await db.testimonial.delete({ where: { id } });

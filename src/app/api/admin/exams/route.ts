@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 
 export async function GET() {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const exams = await db.exam.findMany({
     include: {
@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const body = (await req.json().catch(() => ({}))) as {
     courseId?: string; title?: string; type?: string; durationMin?: number; maxGrade?: number;

@@ -13,7 +13,7 @@ import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
  * 3. Returns a single deep link that opens her YouTube broadcast screen.
  */
 export async function POST(req: Request) {
-  const { user, error } = await apiUser("ADMIN");
+  const { user, error } = await apiUser("TEACHER");
   if (error) return error;
 
   const rl = rateLimit(`livego:${user.id}`, 10, 60_000);
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 
 /** End the class: transition the broadcast to complete + close the LiveSession. */
 export async function DELETE(req: Request) {
-  const { user, error } = await apiUser("ADMIN");
+  const { user, error } = await apiUser("TEACHER");
   if (error) return error;
 
   const { liveSessionId } = (await req.json().catch(() => ({}))) as { liveSessionId?: string };

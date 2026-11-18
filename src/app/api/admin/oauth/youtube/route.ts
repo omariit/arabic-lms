@@ -8,7 +8,7 @@ import { youtubeAuthUrl } from "@/lib/youtube";
  * GET ?action=start → Google consent URL (refresh_token via offline access)
  */
 export async function GET(req: Request) {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
 
   const url = new URL(req.url);

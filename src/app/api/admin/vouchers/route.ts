@@ -5,7 +5,7 @@ import { randomBytes } from "crypto";
 
 /** Voucher generator: single-use access codes. */
 export async function GET() {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const vouchers = await db.voucher.findMany({
     include: { course: { select: { title: true } }, user: { select: { fullName: true } } },
@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { user, error } = await apiUser("ADMIN");
+  const { user, error } = await apiUser("TEACHER");
   if (error) return error;
   const body = (await req.json().catch(() => ({}))) as { courseId?: string; count?: number };
   if (!body.courseId) return NextResponse.json({ error: "courseId مطلوب" }, { status: 400 });

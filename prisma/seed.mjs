@@ -8,28 +8,46 @@ import bcrypt from "bcryptjs";
 
 const db = new PrismaClient();
 
-const ADMIN_PHONE = process.env.ADMIN_PHONE || "0700000000";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "changeme-teacher-1";
+// Platform owner (ADMIN) — that is you. Change via env in production.
+const ADMIN_PHONE = process.env.ADMIN_PHONE || "0777777777";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin-kh-2024";
+
+// The teacher account (TEACHER) — أ. خولة حتاملة. Change via env in production.
+const TEACHER_PHONE = process.env.TEACHER_PHONE || "0700000000";
+const TEACHER_PASSWORD = process.env.TEACHER_PASSWORD || "teacher-kh-2024";
 
 async function main() {
-  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+  const adminHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
   await db.user.upsert({
     where: { phone: ADMIN_PHONE },
-    update: { role: "ADMIN" },
+    update: { role: "ADMIN", passwordHash: adminHash, fullName: "مدير المنصة" },
     create: {
-      fullName: "المعلمة",
+      fullName: "مدير المنصة",
       phone: ADMIN_PHONE,
-      passwordHash,
+      passwordHash: adminHash,
       role: "ADMIN",
     },
   });
-  console.log(`✔ ADMIN teacher ready — phone: ${ADMIN_PHONE}`);
+  console.log(`✔ ADMIN (platform owner) ready — phone: ${ADMIN_PHONE}`);
+
+  const teacherHash = await bcrypt.hash(TEACHER_PASSWORD, 12);
+  await db.user.upsert({
+    where: { phone: TEACHER_PHONE },
+    update: { role: "TEACHER", passwordHash: teacherHash, fullName: "أ. خولة حتاملة" },
+    create: {
+      fullName: "أ. خولة حتاملة",
+      phone: TEACHER_PHONE,
+      passwordHash: teacherHash,
+      role: "TEACHER",
+    },
+  });
+  console.log(`✔ TEACHER (أ. خولة حتاملة) ready — phone: ${TEACHER_PHONE}`);
 
   const existingProfile = await db.teacherProfile.findFirst();
   if (!existingProfile) {
     await db.teacherProfile.create({
       data: {
-        displayName: "أ. أم سلمى",
+        displayName: "أ. خولة حتاملة",
         title: "معلمة قراءات وإتقان وإجازة القراءة بالمستويات الثلاثة",
         bio: "أهلًا بكنّ في منصتي لتعليم القرآن الكريم. متخصصة في تعليم القراءات القرآنية وإتقان التلاوة، ومسندة إجازة القراءة بالسند المتصل للمستويات الثلاثة — للنساء والبنات فقط، ببيئة مريحة ومتواضعة.",
         methodology:
@@ -41,6 +59,12 @@ async function main() {
       },
     });
     console.log("✔ Quran-teacher profile seeded");
+  } else if (existingProfile.displayName !== "أ. خولة حتاملة") {
+    await db.teacherProfile.update({
+      where: { id: existingProfile.id },
+      data: { displayName: "أ. خولة حتاملة" },
+    });
+    console.log("✔ Teacher profile name updated to: أ. خولة حتاملة");
   }
 
   // Sample testimonials (published) — replace/editable from the admin panel

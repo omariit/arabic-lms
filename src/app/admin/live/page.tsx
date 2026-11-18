@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireTeacher } from "@/lib/auth";
 import { OneClickLauncher } from "../one-click-launcher";
 import { Badge, Card, CardContent } from "@/components/ui/primitives";
 import { buttonVariants } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { cn, formatDateAr } from "@/lib/utils";
 
 /** Standalone live launcher page. */
 export default async function AdminLivePage() {
-  await requireAdmin();
+  await requireTeacher();
   const [oauth, lives] = await Promise.all([
     db.teacherOAuthToken.findFirst(),
     db.liveSession.findMany({

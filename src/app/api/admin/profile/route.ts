@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 
 export async function GET() {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   let profile = await db.teacherProfile.findFirst();
   if (!profile) {
@@ -22,7 +22,7 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const current = await db.teacherProfile.findFirst();

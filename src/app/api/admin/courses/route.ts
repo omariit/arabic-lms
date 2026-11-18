@@ -4,7 +4,7 @@ import { apiUser } from "@/lib/auth";
 
 /** Admin course catalog CRUD. */
 export async function GET() {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const courses = await db.course.findMany({
     include: {
@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const body = (await req.json().catch(() => ({}))) as {
     title?: string; description?: string; price?: number; level?: string; coverColor?: string;

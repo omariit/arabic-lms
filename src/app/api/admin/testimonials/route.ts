@@ -4,14 +4,14 @@ import { apiUser } from "@/lib/auth";
 
 /** Testimonials management for the teacher (shown on the public landing page). */
 export async function GET() {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const testimonials = await db.testimonial.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
   return NextResponse.json({ testimonials });
 }
 
 export async function POST(req: Request) {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("TEACHER");
   if (error) return error;
   const body = (await req.json().catch(() => ({}))) as {
     name?: string; text?: string; level?: string; rating?: number; published?: boolean;

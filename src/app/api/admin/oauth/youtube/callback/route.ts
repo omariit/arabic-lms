@@ -5,7 +5,7 @@ import { youtubeOAuthClient, saveTeacherToken } from "@/lib/youtube";
 /** OAuth callback: exchange the consent code for a refresh token and store it securely. */
 export async function GET(req: Request) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "ADMIN") {
+  if (!user || user.role === "STUDENT") {
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin}/login`);
   }
   const url = new URL(req.url);

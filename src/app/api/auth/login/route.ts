@@ -32,6 +32,6 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     role: user.role,
-    redirect: user.role === "ADMIN" ? "/admin" : "/dashboard",
+    redirect: user.role === "STUDENT" ? "/dashboard" : "/admin",
   });
 }

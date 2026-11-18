@@ -1,26 +1,30 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requireTeacher } from "@/lib/auth";
 import { LogoutButton } from "@/components/logout-button";
 
 const NAV = [
-  { href: "/admin", label: "الرئيسية", icon: "🏠" },
-  { href: "/admin/live", label: "بث مباشر", icon: "🔴" },
-  { href: "/admin/grading", label: "التصحيح", icon: "🎤" },
-  { href: "/admin/enrollments", label: "التسجيلات", icon: "✅" },
-  { href: "/admin/profile", label: "إعداداتي", icon: "⚙️" },
+  { href: "/admin", label: "الرئيسية", icon: "🏠", adminOnly: false },
+  { href: "/admin/live", label: "بث مباشر", icon: "🔴", adminOnly: false },
+  { href: "/admin/grading", label: "التصحيح", icon: "🎤", adminOnly: false },
+  { href: "/admin/enrollments", label: "التسجيلات", icon: "✅", adminOnly: false },
+  { href: "/admin/students", label: "المستخدمات", icon: "👩‍🎓", adminOnly: true },
+  { href: "/admin/profile", label: "إعداداتي", icon: "⚙️", adminOnly: false },
 ];
 
-/** Mobile-first teacher shell: large touch targets, sticky bottom nav. */
+/** Staff shell (TEACHER + ADMIN): large touch targets, sticky bottom nav. */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const admin = await requireAdmin();
+  const user = await requireTeacher();
+  const isAdmin = user.role === "ADMIN";
+  const nav = NAV.filter((n) => !n.adminOnly || isAdmin);
+  const cols = nav.length;
 
   return (
     <div className="min-h-dvh pb-24">
       <header className="sticky top-0 z-40 bg-brand-600 text-white shadow">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <div>
-            <p className="text-sm font-extrabold">👩‍🏫 لوحة المعلمة</p>
-            <p className="text-xs text-white/70">{admin.fullName}</p>
+            <p className="text-sm font-extrabold">{isAdmin ? "🛠️ لوحة الإدارة" : "👩‍🏫 لوحة المعلمة"}</p>
+            <p className="text-xs text-white/70">{user.fullName} · {isAdmin ? "مدير المنصة" : "معلمة"}</p>
           </div>
           <LogoutButton />
         </div>
@@ -29,8 +33,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="mx-auto max-w-3xl px-4 pt-4">{children}</div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-100 bg-white shadow-lg">
-        <div className="mx-auto grid max-w-3xl grid-cols-5">
-          {NAV.map((n) => (
+        <div className="mx-auto grid max-w-3xl" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {nav.map((n) => (
             <Link key={n.href} href={n.href} className="flex flex-col items-center gap-0.5 py-3 text-[11px] font-bold text-brand-900 hover:bg-brand-50">
               <span className="text-xl">{n.icon}</span>
               {n.label}

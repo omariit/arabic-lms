@@ -11,7 +11,7 @@ import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
  *    uploaded straight to R2 via a presigned PUT returned in the same response.
  */
 export async function GET(req: Request) {
-  const { user, error } = await apiUser("ADMIN");
+  const { user, error } = await apiUser("TEACHER");
   if (error) return error;
 
   const url = new URL(req.url);
@@ -50,7 +50,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { user, error } = await apiUser("ADMIN");
+  const { user, error } = await apiUser("TEACHER");
   if (error) return error;
 
   const rl = rateLimit(`grade:${user.id}`, 40, 60_000);

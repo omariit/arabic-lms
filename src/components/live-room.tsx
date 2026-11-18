@@ -18,13 +18,13 @@ import { cn } from "@/lib/utils";
 export type LiveRoomProps = {
   liveSessionId: string;
   lessonId: string | null; // live video is delivered through the same protected token flow
-  viewer: { role: "ADMIN" | "STUDENT"; name: string; phone: string };
+  viewer: { role: "ADMIN" | "TEACHER" | "STUDENT"; name: string; phone: string };
 };
 
 type HandEntry = { socketId: string; name: string };
 
 export function LiveRoom({ liveSessionId, lessonId, viewer }: LiveRoomProps) {
-  const isTeacher = viewer.role === "ADMIN";
+  const isTeacher = viewer.role !== "STUDENT"; // TEACHER hosts; ADMIN has the same powers
   const socketRef = useRef<Socket | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);

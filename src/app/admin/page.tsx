@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireTeacher } from "@/lib/auth";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { buttonVariants } from "@/components/ui/button";
 import { cn, formatDateAr } from "@/lib/utils";
 import { OneClickLauncher } from "./one-click-launcher";
 
-/** Teacher dashboard: overview + one-click live launcher. */
+/** Staff dashboard: teacher tools for TEACHER, plus user/security oversight for ADMIN. */
 export default async function AdminDashboard() {
-  await requireAdmin();
+  const user = await requireTeacher();
+  const isAdmin = user.role === "ADMIN";
 
   const [pendingRequests, voiceQueue, recentViolations, activeLives, oauth] = await Promise.all([
     db.enrollmentRequest.count({ where: { status: "PENDING" } }),
@@ -24,10 +25,10 @@ export default async function AdminDashboard() {
       <OneClickLauncher youtubeConnected={Boolean(oauth)} />
 
       {/* Quick stats */}
-      <div className="grid grid-cols-3 gap-3 text-center">
+      <div className={`grid gap-3 text-center ${isAdmin ? "grid-cols-3" : "grid-cols-2"}`}>
         <Link href="/admin/enrollments"><Card className="hover:bg-brand-50"><CardContent className="py-4"><p className="text-2xl font-extrabold">{pendingRequests}</p><p className="text-xs font-bold text-gray-500">طلبات تسجيل</p></CardContent></Card></Link>
         <Link href="/admin/grading"><Card className="hover:bg-brand-50"><CardContent className="py-4"><p className="text-2xl font-extrabold">{voiceQueue}</p><p className="text-xs font-bold text-gray-500">تسجيلات للتصحيح</p></CardContent></Card></Link>
-        <Link href="/admin/violations"><Card className="hover:bg-brand-50"><CardContent className="py-4"><p className="text-2xl font-extrabold">{recentViolations.length}</p><p className="text-xs font-bold text-gray-500">مخالفات أمنية</p></CardContent></Card></Link>
+        {isAdmin && <Link href="/admin/violations"><Card className="hover:bg-brand-50"><CardContent className="py-4"><p className="text-2xl font-extrabold">{recentViolations.length}</p><p className="text-xs font-bold text-gray-500">مخالفات أمنية</p></CardContent></Card></Link>}
       </div>
 
       {/* Active/scheduled live sessions */}
@@ -64,10 +65,10 @@ export default async function AdminDashboard() {
             { href: "/admin/exams", label: "الاختبارات", icon: "📝" },
             { href: "/admin/testimonials", label: "آراء الطالبات", icon: "💬" },
             { href: "/admin/vouchers", label: "الكوبونات", icon: "🎟️" },
-            { href: "/admin/students", label: "الطالبات والأجهزة", icon: "👩‍🎓" },
+            { href: "/admin/students", label: "المستخدمات والأجهزة", icon: "👩‍🎓", adminOnly: true },
             { href: "/admin/profile", label: "ملفي ويوتيوب", icon: "⚙️" },
-            { href: "/admin/violations", label: "سجل الحماية", icon: "🛡️" },
-          ].map((a) => (
+            { href: "/admin/violations", label: "سجل الحماية", icon: "🛡️", adminOnly: true },
+          ].filter((a) => !a.adminOnly || isAdmin).map((a) => (
             <Link key={a.href} href={a.href} className={cn(buttonVariants({ variant: "outline", size: "lg" }), "flex-col gap-1 h-auto py-5")}>
               <span className="text-2xl">{a.icon}</span>
               <span>{a.label}</span>
