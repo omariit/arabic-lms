@@ -190,6 +190,16 @@ export function LiveRoom({ liveSessionId, lessonId, viewer }: LiveRoomProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveSessionId]);
 
+  // Scale-to-zero keep-alive: while the classroom is open, send a cheap HTTP
+  // activity signal every 25s so the hosting scaler never sleeps a live class.
+  useEffect(() => {
+    if (!connected) return;
+    const beat = setInterval(() => {
+      fetch("/api/health", { cache: "no-store" }).catch(() => {});
+    }, 25_000);
+    return () => clearInterval(beat);
+  }, [connected]);
+
   const toggleHand = () => {
     if (myHand) {
       socketRef.current?.emit("lower-hand", { liveSessionId });

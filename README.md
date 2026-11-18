@@ -126,5 +126,9 @@ curl https://arabic-lms-production.up.railway.app/api/health
 - **Zero video bandwidth** — recorded lessons and live streams are YouTube unlisted embeds.
 - **Zero audio-file bandwidth** — student/teacher audio uploads/downloads go browser ↔ Cloudflare R2 via 5–10 minute presigned URLs.
 - **One process** — Next.js SSR + Socket.io/WebRTC signaling share the same Node server (no second service to pay for).
-- **Single replica** enforced by `railway.json` (`numReplicas: 1`) so in-memory rate limiting and the Socket.io room map stay consistent.
+- **Scale-to-zero compatible** — enable *Serverless / autoscale to 0* on the service in the Railway dashboard:
+  - Cold start after idle is ~30–60s (container boot + `prisma migrate deploy` + server start). First visitor waits; subsequent requests are fast.
+  - While anyone is inside a live classroom the client pings `/api/health` every 25s, so an active class is **never** scaled down mid-session.
+  - All durable state lives in PostgreSQL (sessions, attempts, attendance) — restarts and cold starts lose nothing. The only in-memory state (rate-limit buckets, one-time video nonces, Socket.io rooms) is short-lived by design and safe to lose on a spin-down.
+  - Note: Railway PostgreSQL itself does not scale to zero; it is the one always-on component.
 - Streaming uses `transport: websocket` with polling fallback; WebRTC audio-only keeps CPU/RAM minimal.
