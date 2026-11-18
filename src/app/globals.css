@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-brand-50 text-brand-950 antialiased;
+  min-height: 100dvh;
+}
+
+/* Watermark overlay used by the protected player */
+@keyframes watermark-pulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 0.95; }
+}
+.watermark-node {
+  @apply pointer-events-none select-none absolute z-30;
+  animation: watermark-pulse 2s ease-in-out infinite;
+}
+
+/* Hide scrollbar noise in queues */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Video container must own the stacking context in fullscreen */
+.player-wrapper:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}
+.player-wrapper:fullscreen video,
+.player-wrapper:fullscreen iframe {
+  width: 100% !important;
+  height: 100% !important;
+}
