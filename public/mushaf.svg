@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" fill="none">
+  <!-- Elegant open mushaf illustration: emerald + gold, ornate but clean -->
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d4af37"/>
+      <stop offset="0.5" stop-color="#f5d576"/>
+      <stop offset="1" stop-color="#c19a2e"/>
+    </linearGradient>
+    <linearGradient id="pageL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdfbf4"/>
+      <stop offset="1" stop-color="#efe8d3"/>
+    </linearGradient>
+    <linearGradient id="pageR" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8f3e4"/>
+      <stop offset="1" stop-color="#e8dfc4"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.65">
+      <stop offset="0" stop-color="#2d8a6f" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#0b4634" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="400" height="300" rx="0" fill="none"/>
+  <ellipse cx="200" cy="120" rx="185" ry="115" fill="url(#glow)"/>
+
+  <!-- open book -->
+  <g transform="translate(200 150)">
+    <!-- left page -->
+    <path d="M -8 -78 C -60 -92 -105 -88 -132 -76 L -132 62 C -105 50 -60 46 -8 60 Z" fill="url(#pageL)" stroke="url(#gold)" stroke-width="2.5"/>
+    <!-- right page -->
+    <path d="M 8 -78 C 60 -92 105 -88 132 -76 L 132 62 C 105 50 60 46 8 60 Z" fill="url(#pageR)" stroke="url(#gold)" stroke-width="2.5"/>
+    <!-- spine -->
+    <path d="M -8 -78 L -8 60 M 8 -78 L 8 60" stroke="url(#gold)" stroke-width="2.5"/>
+    <path d="M 0 -80 L 0 62" stroke="url(#gold)" stroke-width="1.2" opacity="0.8"/>
+
+    <!-- page lines (fake ayat rows) -->
+    <g stroke="#b7a26a" stroke-width="1.6" stroke-linecap="round" opacity="0.55">
+      <path d="M -118 -58 C -88 -66 -46 -66 -22 -60"/>
+      <path d="M -118 -40 C -88 -48 -46 -48 -22 -42"/>
+      <path d="M -118 -22 C -88 -30 -46 -30 -22 -24"/>
+      <path d="M -118 -4 C -88 -12 -46 -12 -22 -6"/>
+      <path d="M -118 14 C -88 6 -46 6 -22 12"/>
+      <path d="M 22 -58 C 46 -66 88 -66 118 -58"/>
+      <path d="M 22 -40 C 46 -48 88 -48 118 -40"/>
+      <path d="M 22 -22 C 46 -30 88 -30 118 -22"/>
+      <path d="M 22 -4 C 46 -12 88 -12 118 -4"/>
+      <path d="M 22 14 C 46 6 88 6 118 14"/>
+    </g>
+
+    <!-- gold medallion on right page -->
+    <g transform="translate(70 -30)">
+      <circle r="16" fill="#0b4634" stroke="url(#gold)" stroke-width="2"/>
+      <path d="M 0 -9 L 2.6 -2.8 L 9 -2.8 L 3.8 1.2 L 5.8 7.6 L 0 3.8 L -5.8 7.6 L -3.8 1.2 L -9 -2.8 L -2.6 -2.8 Z" fill="url(#gold)"/>
+    </g>
+
+    <!-- ornamental corner flourishes -->
+    <g stroke="url(#gold)" stroke-width="1.6" opacity="0.9" fill="none">
+      <path d="M -122 -70 C -114 -74 -108 -74 -102 -70"/>
+      <path d="M 122 -70 C 114 -74 108 -74 102 -70"/>
+      <path d="M -122 54 C -114 50 -108 50 -102 54"/>
+      <path d="M 122 54 C 114 50 108 50 102 54"/>
+    </g>
+  </g>
+
+  <!-- rehal (book stand) -->
+  <g stroke="url(#gold)" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M 120 218 L 200 182 L 280 218"/>
+    <path d="M 128 226 L 200 194 L 272 226"/>
+  </g>
+  <!-- soft shadow under book -->
+  <ellipse cx="200" cy="236" rx="120" ry="10" fill="#062b20" opacity="0.35"/>
+</svg>

@@ -345,3 +345,17 @@ model AttendanceLog {
   @@index([liveSessionId])
   @@index([userId])
 }
+
+// ---------- Public social proof (landing page) ----------
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String // e.g. "أ. فاطمة — إجازة في حفظ" (full names hidden by default)
+  text      String   @db.Text
+  level     String? // المستوى / الدورة الإجازة فيها
+  rating    Int      @default(5) // 1..5
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([published])
+}

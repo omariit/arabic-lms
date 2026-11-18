@@ -62,6 +62,7 @@ export default async function AdminDashboard() {
           {[
             { href: "/admin/courses", label: "الدورات والدروس", icon: "📚" },
             { href: "/admin/exams", label: "الاختبارات", icon: "📝" },
+            { href: "/admin/testimonials", label: "آراء الطالبات", icon: "💬" },
             { href: "/admin/vouchers", label: "الكوبونات", icon: "🎟️" },
             { href: "/admin/students", label: "الطالبات والأجهزة", icon: "👩‍🎓" },
             { href: "/admin/profile", label: "ملفي ويوتيوب", icon: "⚙️" },
