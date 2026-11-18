@@ -6,8 +6,12 @@
   color-scheme: light;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  @apply bg-brand-50 text-brand-950 antialiased;
+  @apply bg-[#faf8f2] text-emerald-950 antialiased;
   min-height: 100dvh;
 }
 
@@ -35,4 +39,35 @@ body {
 .player-wrapper:fullscreen iframe {
   width: 100% !important;
   height: 100% !important;
+}
+
+/* ── Landing design system ─────────────────────────────── */
+
+/* Subtle 8-point star (khatam) arabesque tile, emerald/gold */
+.pattern-khatam {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23f5d576' stroke-opacity='0.16'%3E%3Crect x='18' y='18' width='36' height='36' transform='rotate(45 36 36)'/%3E%3Crect x='23' y='23' width='26' height='26'/%3E%3Ccircle cx='36' cy='36' r='4'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 72px 72px;
+}
+.pattern-khatam-light {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%230b4634' stroke-opacity='0.055'%3E%3Crect x='18' y='18' width='36' height='36' transform='rotate(45 36 36)'/%3E%3Crect x='23' y='23' width='26' height='26'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 72px 72px;
+}
+
+/* Gold hairline divider with center ornament */
+.ornament-divider {
+  @apply flex items-center justify-center gap-3;
+}
+.ornament-divider::before,
+.ornament-divider::after {
+  content: "";
+  @apply h-px w-16 sm:w-24;
+  background: linear-gradient(to left, transparent, rgba(212, 175, 55, 0.6));
+}
+.ornament-divider::after {
+  background: linear-gradient(to right, transparent, rgba(212, 175, 55, 0.6));
+}
+
+/* Anchor offset for sticky navs */
+section[id] {
+  scroll-margin-top: 5rem;
 }
