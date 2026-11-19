@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { LiveRoom } from "@/components/live-room";
 
+
+export const metadata = { robots: { index: false, follow: false } };
 export default async function LiveClassroomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getCurrentUser();

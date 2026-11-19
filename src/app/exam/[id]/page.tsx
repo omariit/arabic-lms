@@ -3,6 +3,8 @@ import { requireStudent } from "@/lib/auth";
 import { ExamRunner } from "./exam-runner";
 import { VoiceExam } from "./voice-exam";
 
+
+export const metadata = { robots: { index: false, follow: false } };
 export default async function ExamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireStudent();

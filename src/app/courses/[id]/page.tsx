@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -9,6 +10,35 @@ import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui
 import { buttonVariants } from "@/components/ui/button";
 import { cn, formatSeconds } from "@/lib/utils";
 import { EnrollActions } from "./enroll-actions";
+
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://arabic-lms-production.up.railway.app";
+
+/** SEO metadata per course (title, description, OpenGraph). */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const course = await db.course.findUnique({
+      where: { id },
+      select: { title: true, description: true, level: true, published: true },
+    });
+    if (!course || !course.published) return { robots: { index: false } };
+    const suffix = course.title.includes(course.level) ? "" : ` — ${course.level}`;
+    return {
+      title: `${course.title}${suffix}`,
+      description: course.description.slice(0, 160),
+      alternates: { canonical: `/courses/${id}` },
+      openGraph: {
+        title: `${course.title} | مُقْرِئَة`,
+        description: course.description.slice(0, 160),
+        url: `${BASE_URL}/courses/${id}`,
+        images: ["/og.png"],
+        type: "website",
+      },
+    };
+  } catch {
+    return { robots: { index: false } };
+  }
+}
 
 /** Course detail: country-aware monthly price, curriculum, and paid-enrollment flow. */
 export default async function CoursePage({ params }: { params: Promise<{ id: string }> }) {

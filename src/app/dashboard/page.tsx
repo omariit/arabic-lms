@@ -8,6 +8,8 @@ import { getLocale, t } from "@/lib/i18n";
 import { VoucherRedeem } from "./voucher-redeem";
 import { LogoutButton } from "@/components/logout-button";
 
+
+export const metadata = { robots: { index: false, follow: false } };
 /** Student dashboard: enrollments, upcoming live classes, pending exams, voucher redeem, chat. */
 export default async function StudentDashboard() {
   const user = await requireStudent();

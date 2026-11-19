@@ -16,10 +16,57 @@ const tajawal = Tajawal({
   display: "swap",
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://arabic-lms-production.up.railway.app";
+
 export const metadata: Metadata = {
-  title: "مُقْرِئَة | منصة إتقان القرآن — حتى الإجازة",
-  description: "منصة مُقْرِئَة: تعلّمي القرآن وإتقان تلاوتك على يد معلمة معتمدة — دروس مسجلة، حصص مباشرة، واختبارات إلكترونية وصوتية",
+  metadataBase: new URL(BASE_URL),
+  title: {
+    default: "مُقْرِئَة | منصة إتقان القرآن — حتى الإجازة",
+    template: "%s | مُقْرِئَة",
+  },
+  description:
+    "منصة مُقْرِئَة: تعلّمي القرآن وإتقان تلاوتك على يد معلمة إجازة معتمدة — دروس مسجلة، حصص مباشرة، تصحيح صوتي فردي، واختبارات إلكترونية وصوتية حتى الإجازة بالسند المتصل.",
+  keywords: [
+    "تعليم القرآن للنساء",
+    "إتقان القرآن",
+    "تلاوة القرآن",
+    "دورات تجويد اونلاين",
+    "القراءات العشر",
+    "الإجازة بالسند",
+    "معلمة قرآن أونلاين",
+    "قراءة القرآن بالتجويد",
+    "تعلم القرآن عن بعد",
+    "Quran ijazah for women",
+    "online Quran tajweed",
+  ],
+  applicationName: "مُقْرِئَة",
   manifest: "/manifest.json",
+  alternates: {
+    canonical: "/",
+    languages: { ar: "/", en: "/" },
+  },
+  openGraph: {
+    type: "website",
+    siteName: "مُقْرِئَة",
+    title: "مُقْرِئَة | منصة إتقان القرآن — حتى الإجازة",
+    description:
+      "تعلّمي القرآن وإتقان تلاوتك على يد معلمة إجازة معتمدة — دروس، حصص مباشرة، وتصحيح صوتي فردي حتى الإجازة بالسند المتصل.",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "مُقْرِئَة — منصة إتقان القرآن" }],
+    locale: "ar_JO",
+    alternateLocale: ["en_US"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "مُقْرِئَة | منصة إتقان القرآن — حتى الإجازة",
+    description: "تعلّمي القرآن وإتقان تلاوتك — دروس، حصص مباشرة، وتصحيح صوتي فردي حتى الإجازة.",
+    images: ["/og.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+  },
+  icons: { icon: "/icon.svg", apple: "/logo-square.png" },
 };
 
 export const viewport: Viewport = {

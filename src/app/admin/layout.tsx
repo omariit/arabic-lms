@@ -15,6 +15,8 @@ const NAV = [
   { href: "/admin/profile", label: "إعداداتي", icon: "⚙️", teacher: true },
 ];
 
+
+export const metadata = { robots: { index: false, follow: false } };
 /** Staff shell (TEACHER + ADMIN + ASSISTANT): large touch targets, sticky bottom nav.
  * The ASSISTANT only sees the chat inbox. The badge shows total unread chats. */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

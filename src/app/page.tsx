@@ -103,6 +103,49 @@ export default async function LandingPage() {
     : "Hello, I would like to ask about the Quran recitation and Ijazah courses 🌙";
   const waHref = wa ? waLink(wa, waMessage) : null;
 
+  // Structured data for search engines (Organization + Courses)
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://arabic-lms-production.up.railway.app";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "EducationalOrganization",
+        "@id": `${baseUrl}/#organization`,
+        name: "مُقْرِئَة",
+        alternateName: "Muqri'ah",
+        url: baseUrl,
+        logo: `${baseUrl}/logo-square.png`,
+        image: `${baseUrl}/og.png`,
+        description: ar
+          ? "منصة نسائية متخصصة في إتقان تلاوة القرآن الكريم والقراءات العشر حتى الإجازة بالسند المتصل"
+          : "A women's platform dedicated to mastering Quran recitation and the Ten Qira'at up to Ijazah with a connected chain",
+      },
+      {
+        "@type": "Person",
+        name: profile?.displayName,
+        jobTitle: profile?.title,
+        description: profile?.bio,
+        worksFor: { "@id": `${baseUrl}/#organization` },
+        ...(profile?.photoUrl ? { image: profile.photoUrl } : {}),
+      },
+      ...courses.map((c) => ({
+        "@type": "Course",
+        name: c.title,
+        description: c.description,
+        inLanguage: "ar",
+        provider: { "@id": `${baseUrl}/#organization` },
+        offers: {
+          "@type": "Offer",
+          price: c.overridePrice ?? c.defaultPrice,
+          priceCurrency:
+            c.overridePrice !== null && c.overridePrice !== c.defaultPrice ? currencyFor(viewerCountry) : "JOD",
+          category: "Subscription",
+        },
+        url: `${baseUrl}/courses/${c.id}`,
+      })),
+    ],
+  };
+
   const achievements = (profile?.achievements ?? "").split("\n").filter(Boolean);
   const heroLines: string[] = Array.isArray(d.heroLines) ? d.heroLines : [];
   const statsValues: number[] = Array.isArray(d.statsValues) ? d.statsValues.map(Number) : [];
@@ -123,6 +166,10 @@ export default async function LandingPage() {
 
   return (
     <main className="min-h-dvh bg-[#faf8f2]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* ─── Bismillah bar ─── */}
       <div className="bg-emerald-950 py-2.5 text-center">
         <p className="font-display text-sm text-amber-200/95 sm:text-base">{d.bismillah}</p>

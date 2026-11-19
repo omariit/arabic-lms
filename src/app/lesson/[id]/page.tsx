@@ -6,6 +6,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** Lesson playback page: protected, watermarked player — enrollment verified server-side. */
+
+export const metadata = { robots: { index: false, follow: false } };
 export default async function LessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireStudent();
