@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 import { youtubeAuthUrl } from "@/lib/youtube";
@@ -19,7 +21,15 @@ export async function GET(req: Request) {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
       return NextResponse.json({ error: "Google OAuth غير مهيأ على الخادم" }, { status: 503 });
     }
-    const state = Math.random().toString(36).slice(2);
+    const state = randomBytes(16).toString("hex");
+    const jar = await cookies();
+    jar.set("yt_oauth_state", state, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/api/admin/oauth/youtube",
+      maxAge: 600,
+    });
     return NextResponse.json({ authUrl: youtubeAuthUrl(redirectUri, state), redirectUri });
   }
 
