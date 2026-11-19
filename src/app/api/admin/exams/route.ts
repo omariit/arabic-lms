@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   const { error } = await apiUser("TEACHER");
   if (error) return error;
   const body = (await req.json().catch(() => ({}))) as {
-    courseId?: string; title?: string; type?: string; durationMin?: number; maxGrade?: number;
+    courseId?: string; title?: string; type?: string; durationMin?: number; maxGrade?: number; published?: boolean;
   };
   if (!body.courseId || !body.title?.trim()) return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
   const exam = await db.exam.create({
@@ -30,6 +30,7 @@ export async function POST(req: Request) {
       type: body.type === "VOICE" ? "VOICE" : "MCQ",
       durationMin: Math.max(1, Number(body.durationMin) || 15),
       maxGrade: Math.max(1, Number(body.maxGrade) || 100),
+      published: Boolean(body.published),
     },
   });
   return NextResponse.json({ exam });

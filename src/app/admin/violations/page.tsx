@@ -1,6 +1,8 @@
+import { requireAdmin } from "@/lib/auth";
 import { ViolationsClient } from "./violations-client";
 
-export default function AdminViolationsPage() {
+export default async function AdminViolationsPage() {
+  await requireAdmin();
   return (
     <main className="space-y-4">
       <h1 className="text-xl font-extrabold">🛡️ سجل الحماية</h1>

@@ -2,7 +2,7 @@
  * Web Push (VAPID) — server side.
  * Sends push notifications to saved subscriptions (students + staff).
  */
-import webpush from "web-push";
+import { sendNotification, setVapidDetails } from "web-push";
 import { db } from "@/lib/db";
 
 let configured = false;
@@ -12,7 +12,7 @@ function ensureConfigured() {
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   const subject = process.env.VAPID_SUBJECT || "mailto:admin@muqriah.app";
   if (!publicKey || !privateKey) return false;
-  webpush.setVapidDetails(subject, publicKey, privateKey);
+  setVapidDetails(subject, publicKey, privateKey);
   configured = true;
   return true;
 }
@@ -59,7 +59,7 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
   await Promise.all(
     subs.map(async (s) => {
       try {
-        await webpush.sendNotification(
+        await sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
           JSON.stringify(payload)
         );

@@ -8,6 +8,7 @@ export async function GET() {
   if (error) return error;
   const courses = await db.course.findMany({
     include: {
+      prices: true,
       _count: { select: { modules: true, enrollments: true, exams: true } },
       modules: { orderBy: { position: "asc" }, include: { lessons: { orderBy: { position: "asc" } } } },
     },

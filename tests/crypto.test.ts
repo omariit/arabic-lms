@@ -66,10 +66,13 @@ describe("fingerprintFrom", () => {
   });
 
   it("changes when any component changes", () => {
-    expect(fingerprintFrom(base)).not.toBe(fingerprintFrom({ ...base, ip: "5.6.7.8" }));
     expect(fingerprintFrom(base)).not.toBe(fingerprintFrom({ ...base, userAgent: "UA2" }));
     expect(fingerprintFrom(base)).not.toBe(fingerprintFrom({ ...base, platform: "iOS" }));
     expect(fingerprintFrom(base)).not.toBe(fingerprintFrom({ ...base, acceptLanguage: "en" }));
+  });
+
+  it("ignores the IP so mobile network switches do not log users out", () => {
+    expect(fingerprintFrom(base)).toBe(fingerprintFrom({ ...base, ip: "5.6.7.8" }));
   });
 
   it("produces a 64-char hex digest (sha256)", () => {

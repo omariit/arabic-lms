@@ -4,9 +4,12 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Badge, Textarea } from "@/components/ui/primitives";
+import { COUNTRIES, countryName } from "@/lib/phone";
 
 type Module = { id: string; title: string; position: number; lessons: Lesson[] };
 type Lesson = { id: string; title: string; youtubeId: string; access: string; position: number; description?: string; scriptText?: string; assignmentTitle?: string | null; assignmentInstructions?: string };
+type CoursePrice = { id?: string; countryCode: string; price: number };
+type CourseInfo = { price: number; weeklyMeetings: string; prices: CoursePrice[]; modules: Module[] };
 
 const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
@@ -48,6 +51,11 @@ export function CourseBuilder() {
   const [moduleTitle, setModuleTitle] = useState("");
   const [weeklyMeetings, setWeeklyMeetings] = useState("");
   const [meetingsSaved, setMeetingsSaved] = useState(false);
+  const [basePrice, setBasePrice] = useState(0);
+  const [prices, setPrices] = useState<CoursePrice[]>([]);
+  const [newCC, setNewCC] = useState("US");
+  const [newPrice, setNewPrice] = useState("");
+  const [priceSaved, setPriceSaved] = useState(false);
   const [lessonForms, setLessonForms] = useState<Record<string, { title: string; youtubeId: string; access: string }>>({});
   const [editing, setEditing] = useState<Record<string, { title: string; youtubeId: string; access: string; description: string; scriptText: string; assignmentTitle: string; assignmentInstructions: string }>>({});
 
@@ -56,9 +64,11 @@ export function CourseBuilder() {
     try {
       const res = await fetch("/api/admin/courses");
       const data = await res.json();
-      const course = (data.courses ?? []).find((c: { id: string }) => c.id === courseId);
+      const course = (data.courses ?? []).find((c: { id: string }) => c.id === courseId) as (CourseInfo & { id: string }) | undefined;
       setModules(course?.modules ?? []);
       setWeeklyMeetings(course?.weeklyMeetings ?? "");
+      setBasePrice(Number(course?.price ?? 0));
+      setPrices(course?.prices ?? []);
       setLoaded(true);
     } finally { setBusy(false); }
   };
@@ -118,6 +128,24 @@ export function CourseBuilder() {
     });
   };
 
+  const savePrice = async () => {
+    const value = Number(newPrice);
+    if (!Number.isFinite(value) || value < 0) return;
+    await fetch(`/api/admin/courses/${courseId}/pricing`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ countryCode: newCC, price: value }),
+    });
+    setNewPrice("");
+    setPriceSaved(true);
+    setTimeout(() => setPriceSaved(false), 2500);
+    await load();
+  };
+
+  const deletePrice = async (cc: string) => {
+    await fetch(`/api/admin/courses/${courseId}/pricing?countryCode=${cc}`, { method: "DELETE" });
+    await load();
+  };
+
   const saveMeetings = () => run(async () => {
     await fetch(`/api/admin/courses/${courseId}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
@@ -164,6 +192,45 @@ export function CourseBuilder() {
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardContent className="space-y-3 pt-5">
+          <div>
+            <Label>💵 السعر الشهري الأساسي</Label>
+            <p className="mt-1 text-sm text-brand-900/70">
+              {basePrice === 0 ? "مجانية" : <><span className="font-extrabold text-brand-800">{basePrice} دينار</span> شهريًا</>}
+              <span className="text-brand-900/50"> — يُطبَّق على أي دولة ليست لها قيمة مخصّصة بالأَسفل.</span>
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-brand-50/60 p-3">
+            <p className="text-xs font-extrabold text-brand-900">🌍 أسعار مخصّصة لكل دولة</p>
+            {prices.length === 0 ? (
+              <p className="mt-1 text-xs text-brand-900/55">لا توجد أسعار مخصّصة — الجميع يرى السعر الأساسي.</p>
+            ) : (
+              <ul className="mt-2 space-y-1.5">
+                {prices.map((p) => (
+                  <li key={p.countryCode} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm">
+                    <span className="font-bold">{countryName(p.countryCode)} <span className="text-xs text-brand-900/45" dir="ltr">({p.countryCode})</span></span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-extrabold text-brand-800">{p.price === 0 ? "مجانية" : `${p.price} ${p.countryCode === "US" ? "$" : "دينار"}`}</span>
+                      <button onClick={() => deletePrice(p.countryCode)} className="rounded-lg border border-red-200 px-2 py-0.5 text-xs font-bold text-red-600">حذف</button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-2 flex gap-2">
+              <Select value={newCC} onChange={(e) => setNewCC(e.target.value)} className="min-w-0 flex-1">
+                {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.nameAr}</option>)}
+              </Select>
+              <Input dir="ltr" type="number" className="w-24" placeholder="السعر" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
+              <Button onClick={savePrice} disabled={!newPrice.trim()}>إضافة</Button>
+            </div>
+            {priceSaved && <p className="mt-1 text-xs font-bold text-brand-700">تم الحفظ ✓</p>}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="pt-5">
           <Label>🗓 جدول اللقاءات الأسبوعية المباشرة (يظهر في صفحة الدورة)</Label>

@@ -49,11 +49,13 @@ export function decodeToken<T = Record<string, unknown>>(token: string): T | nul
 /** Device fingerprint: SHA-256 of stable client characteristics + IP. */
 export function fingerprintFrom(parts: {
   userAgent: string;
-  ip: string;
+  /** Kept for logging only — NOT part of the hash: mobile IPs rotate on every
+   * network switch (4G/Wi-Fi), which would silently log real users out. */
+  ip?: string;
   acceptLanguage?: string;
   platform?: string;
 }): string {
-  const raw = `${parts.userAgent}|${parts.ip}|${parts.acceptLanguage ?? ""}|${parts.platform ?? ""}`;
+  const raw = `${parts.userAgent}|${parts.acceptLanguage ?? ""}|${parts.platform ?? ""}`;
   return createHash("sha256").update(raw).digest("hex");
 }
 

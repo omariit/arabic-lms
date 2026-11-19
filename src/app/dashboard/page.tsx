@@ -20,6 +20,10 @@ export default async function StudentDashboard() {
   const chatUnread = await db.conversation.count({
     where: { studentId: user.id, studentUnread: { gt: 0 } },
   }).catch(() => 0);
+  // Unread teacher feedback on lesson assignments (private per-lesson threads).
+  const assignmentUnread = await db.lessonThread.count({
+    where: { studentId: user.id, studentUnread: { gt: 0 } },
+  }).catch(() => 0);
 
   const [enrollments, liveSessions, attempts] = await Promise.all([
     db.enrollment.findMany({
@@ -77,6 +81,22 @@ export default async function StudentDashboard() {
         )}
       </Link>
 
+      {/* Lesson assignment feedback waiting for her */}
+      {assignmentUnread > 0 && (
+        <Link href="/dashboard#courses" className="mb-6 flex items-center justify-between rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm transition hover:border-amber-400">
+          <span className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-200 text-xl">📝</span>
+            <span>
+              <span className="block text-sm font-extrabold text-amber-950">لديكِ تصحيح جديد من المعلمة</span>
+              <span className="block text-[11px] text-amber-900/70">على واجباتك في الدروس — افتحي الدرس للمراجعة</span>
+            </span>
+          </span>
+          <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-amber-500 px-2 text-xs font-extrabold text-white">
+            {assignmentUnread.toLocaleString(locale === "ar" ? "ar-EG" : "en-US")}
+          </span>
+        </Link>
+      )}
+
       {/* Live now */}
       {liveSessions.length > 0 && (
         <section className="mb-8">
@@ -98,7 +118,7 @@ export default async function StudentDashboard() {
       )}
 
       {/* My courses */}
-      <section className="mb-8">
+      <section id="courses" className="mb-8 scroll-mt-6">
         <h2 className="mb-3 text-lg font-extrabold">📚 دوراتي</h2>
         {enrollments.length === 0 ? (
           <Card><CardContent className="text-center text-gray-500">

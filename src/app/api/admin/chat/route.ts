@@ -8,6 +8,7 @@ export async function GET() {
   if (error) return error;
 
   const conversations = await db.conversation.findMany({
+    where: { messages: { some: {} } },
     orderBy: { lastMessageAt: "desc" },
     take: 200,
     include: {

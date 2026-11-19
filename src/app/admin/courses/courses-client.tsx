@@ -14,6 +14,8 @@ export function CoursesClient() {
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("0");
+  const [description, setDescription] = useState("");
+  const [level, setLevel] = useState("");
 
   const load = async () => {
     setBusy(true);
@@ -30,9 +32,11 @@ export function CoursesClient() {
     try {
       await fetch("/api/admin/courses", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, price: Number(price) }),
+        body: JSON.stringify({ title, price: Number(price), description: description.trim(), level: level.trim() || undefined }),
       });
       setTitle("");
+      setDescription("");
+      setLevel("");
       await load();
     } finally { setBusy(false); }
   };
@@ -56,10 +60,15 @@ export function CoursesClient() {
     <div className="space-y-4">
       <Card>
         <CardContent className="pt-5">
-          <div className="flex gap-2">
+          <div className="space-y-2">
             <Input placeholder="عنوان الدورة الجديدة" value={title} onChange={(e) => setTitle(e.target.value)} />
-            <Input dir="ltr" type="number" className="w-24" value={price} onChange={(e) => setPrice(e.target.value)} />
-            <Button onClick={create} disabled={busy || !title.trim}>إنشاء</Button>
+            <Input placeholder="المستوى (مثال: المستوى الأول — إتقان)" value={level} onChange={(e) => setLevel(e.target.value)} />
+            <Input placeholder="وصف مختصر يظهر على الصفحة الرئيسية" value={description} onChange={(e) => setDescription(e.target.value)} />
+            <div className="flex gap-2">
+              <Input dir="ltr" type="number" className="w-28" placeholder="السعر" value={price} onChange={(e) => setPrice(e.target.value)} />
+              <Button onClick={create} disabled={busy || !title.trim()} className="flex-1">إنشاء</Button>
+            </div>
+            <p className="text-xs text-brand-900/50">تُنشأ الدورة كمسودة — أضيفي الدروس ثم انشريها.</p>
           </div>
         </CardContent>
       </Card>
