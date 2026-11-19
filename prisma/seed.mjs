@@ -16,32 +16,37 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin-kh-2024";
 const TEACHER_PHONE = process.env.TEACHER_PHONE || "0700000000";
 const TEACHER_PASSWORD = process.env.TEACHER_PASSWORD || "teacher-kh-2024";
 
+// Store phones as E.164 (+962...). Seeds are Jordanian by default; override via env.
+const jordan = (p) => (p.startsWith("+") ? p : "+962" + p.replace(/^0+/, ""));
+const ADMIN_E164 = jordan(ADMIN_PHONE);
+const TEACHER_E164 = jordan(TEACHER_PHONE);
+
 async function main() {
   const adminHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
   await db.user.upsert({
-    where: { phone: ADMIN_PHONE },
+    where: { phone: ADMIN_E164 },
     update: { role: "ADMIN", passwordHash: adminHash, fullName: "مدير المنصة" },
     create: {
       fullName: "مدير المنصة",
-      phone: ADMIN_PHONE,
+      phone: ADMIN_E164,
       passwordHash: adminHash,
       role: "ADMIN",
     },
   });
-  console.log(`✔ ADMIN (platform owner) ready — phone: ${ADMIN_PHONE}`);
+  console.log(`✔ ADMIN (platform owner) ready — phone: ${ADMIN_PHONE} (${ADMIN_E164})`);
 
   const teacherHash = await bcrypt.hash(TEACHER_PASSWORD, 12);
   await db.user.upsert({
-    where: { phone: TEACHER_PHONE },
+    where: { phone: TEACHER_E164 },
     update: { role: "TEACHER", passwordHash: teacherHash, fullName: "أ. خولة حتاملة" },
     create: {
       fullName: "أ. خولة حتاملة",
-      phone: TEACHER_PHONE,
+      phone: TEACHER_E164,
       passwordHash: teacherHash,
       role: "TEACHER",
     },
   });
-  console.log(`✔ TEACHER (أ. خولة حتاملة) ready — phone: ${TEACHER_PHONE}`);
+  console.log(`✔ TEACHER (أ. خولة حتاملة) ready — phone: ${TEACHER_PHONE} (${TEACHER_E164})`);
 
   const existingProfile = await db.teacherProfile.findFirst();
   if (!existingProfile) {
