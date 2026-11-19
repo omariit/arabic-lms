@@ -9,11 +9,11 @@ import bcrypt from "bcryptjs";
 const db = new PrismaClient();
 
 // Platform owner (ADMIN) — that is you. Change via env in production.
-const ADMIN_PHONE = process.env.ADMIN_PHONE || "0777777777";
+const ADMIN_PHONE = process.env.ADMIN_PHONE || "0787262186";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin-kh-2024";
 
 // The teacher account (TEACHER) — أ. خولة حتاملة. Change via env in production.
-const TEACHER_PHONE = process.env.TEACHER_PHONE || "0700000000";
+const TEACHER_PHONE = process.env.TEACHER_PHONE || "0785054355";
 const TEACHER_PASSWORD = process.env.TEACHER_PASSWORD || "teacher-kh-2024";
 
 // Store phones as E.164 (+962...). Seeds are Jordanian by default; override via env.

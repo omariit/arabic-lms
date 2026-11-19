@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <!-- Elegant hijab silhouette avatar placeholder (used until the teacher uploads her photo) -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f5c46"/>
+      <stop offset="1" stop-color="#063529"/>
+    </linearGradient>
+    <linearGradient id="veil" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f5d576"/>
+      <stop offset="1" stop-color="#c19a2e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="120" cy="120" r="120" fill="url(#bg)"/>
+  <g fill="url(#veil)">
+    <!-- hijab shape -->
+    <path d="M120 42c-26 0-46 21-46 47 0 10 3 19 8 27-8 12-14 27-14 44 0 20 8 34 20 40h64c12-6 20-20 20-40 0-17-6-32-14-44 5-8 8-17 8-27 0-26-20-47-46-47z" opacity="0.92"/>
+  </g>
+  <!-- face -->
+  <ellipse cx="120" cy="104" rx="24" ry="28" fill="#e8c49a"/>
+  <!-- features -->
+  <g fill="#063529" opacity="0.85">
+    <circle cx="110" cy="100" r="2.6"/>
+    <circle cx="130" cy="100" r="2.6"/>
+    <path d="M112 116q8 6 16 0" stroke="#063529" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  </g>
+  <!-- gold crescent pin -->
+  <path d="M146 78a10 10 0 1 0 6 18 12 12 0 1 1-6-18z" fill="#0b4634" opacity="0.6"/>
+</svg>
