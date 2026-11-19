@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Badge } from "@/components/ui/primitives";
+import { Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Badge, Textarea } from "@/components/ui/primitives";
 
 type Module = { id: string; title: string; position: number; lessons: Lesson[] };
-type Lesson = { id: string; title: string; youtubeId: string; access: string; position: number };
+type Lesson = { id: string; title: string; youtubeId: string; access: string; position: number; description?: string; scriptText?: string; assignmentTitle?: string | null; assignmentInstructions?: string };
 
 const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
@@ -46,8 +46,10 @@ export function CourseBuilder() {
   const [busy, setBusy] = useState(false);
 
   const [moduleTitle, setModuleTitle] = useState("");
+  const [weeklyMeetings, setWeeklyMeetings] = useState("");
+  const [meetingsSaved, setMeetingsSaved] = useState(false);
   const [lessonForms, setLessonForms] = useState<Record<string, { title: string; youtubeId: string; access: string }>>({});
-  const [editing, setEditing] = useState<Record<string, { title: string; youtubeId: string; access: string }>>({});
+  const [editing, setEditing] = useState<Record<string, { title: string; youtubeId: string; access: string; description: string; scriptText: string; assignmentTitle: string; assignmentInstructions: string }>>({});
 
   const load = async () => {
     setBusy(true);
@@ -56,6 +58,7 @@ export function CourseBuilder() {
       const data = await res.json();
       const course = (data.courses ?? []).find((c: { id: string }) => c.id === courseId);
       setModules(course?.modules ?? []);
+      setWeeklyMeetings(course?.weeklyMeetings ?? "");
       setLoaded(true);
     } finally { setBusy(false); }
   };
@@ -115,6 +118,15 @@ export function CourseBuilder() {
     });
   };
 
+  const saveMeetings = () => run(async () => {
+    await fetch(`/api/admin/courses/${courseId}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weeklyMeetings }),
+    });
+    setMeetingsSaved(true);
+    setTimeout(() => setMeetingsSaved(false), 2500);
+  });
+
   const saveLesson = (lesson: Lesson) => {
     const form = editing[lesson.id];
     if (!form) return;
@@ -122,7 +134,7 @@ export function CourseBuilder() {
     return run(async () => {
       await fetch(`/api/admin/lessons/${lesson.id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: form.title, youtubeId: ytId, access: form.access }),
+        body: JSON.stringify({ title: form.title, youtubeId: ytId, access: form.access, description: form.description, scriptText: form.scriptText, assignmentTitle: form.assignmentTitle, assignmentInstructions: form.assignmentInstructions }),
       });
       setEditing((e) => { const n = { ...e }; delete n[lesson.id]; return n; });
       await load();
@@ -152,6 +164,16 @@ export function CourseBuilder() {
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardContent className="pt-5">
+          <Label>🗓 جدول اللقاءات الأسبوعية المباشرة (يظهر في صفحة الدورة)</Label>
+          <Textarea rows={3} placeholder={"مثال:\nالثلاثاء 6:00 م — تسميع جماعي\nالخميس 6:00 م — درس جديد"} value={weeklyMeetings} onChange={(e) => setWeeklyMeetings(e.target.value)} />
+          <div className="mt-2 flex items-center gap-2">
+            <Button onClick={saveMeetings} disabled={busy}>{meetingsSaved ? "تم الحفظ ✓" : "حفظ الجدول"}</Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="pt-5">
           <Label>➕ قسم جديد داخل الدورة</Label>
@@ -207,7 +229,8 @@ export function CourseBuilder() {
                     <div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row">
                       <button className={arrow} onClick={() => moveLesson(m, l, -1)} disabled={busy || li === 0} aria-label="أعلى">▲</button>
                       <button className={arrow} onClick={() => moveLesson(m, l, 1)} disabled={busy || li === sortedLessons.length - 1} aria-label="أسفل">▼</button>
-                      <Button size="sm" variant="outline" onClick={() => setEditing((e) => ({ ...e, [l.id]: { title: l.title, youtubeId: l.youtubeId, access: l.access } }))}>تعديل</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditing((e) => ({ ...e, [l.id]: { title: l.title, youtubeId: l.youtubeId, access: l.access, description: l.description ?? "", scriptText: l.scriptText ?? "", assignmentTitle: l.assignmentTitle ?? "", assignmentInstructions: l.assignmentInstructions ?? "" } }))}>تعديل</Button>
+                      <a href={`/admin/lessons/${l.id}`} className="rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-extrabold text-amber-800">📥 الواجبات</a>
                       <Button size="sm" variant="outline" onClick={() => deleteLesson(l.id)} disabled={busy}>حذف</Button>
                     </div>
                   </div>
@@ -216,6 +239,10 @@ export function CourseBuilder() {
                     <div className="mt-3 space-y-2 rounded-xl border border-brand-200 bg-white p-3">
                       <Input value={editing[l.id].title} placeholder="العنوان" onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], title: e.target.value } }))} />
                       <Input dir="ltr" value={editing[l.id].youtubeId} placeholder="رابط يوتيوب أو معرّف الفيديو" onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], youtubeId: e.target.value } }))} />
+                      <Textarea rows={2} placeholder="وصف المحاضرة (يظهر تحت الفيديو)" value={editing[l.id].description} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], description: e.target.value } }))} />
+                      <Textarea rows={4} placeholder="السكريبت / النص الكامل للدرس" value={editing[l.id].scriptText} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], scriptText: e.target.value } }))} />
+                      <Input placeholder="عنوان الواجب (اختياري)" value={editing[l.id].assignmentTitle} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], assignmentTitle: e.target.value } }))} />
+                      <Textarea rows={3} placeholder="تعليمات الواجب" value={editing[l.id].assignmentInstructions} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], assignmentInstructions: e.target.value } }))} />
                       <div className="flex gap-2">
                         <Select value={editing[l.id].access} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], access: e.target.value } }))}>
                           <option value="ENROLLED">للمسجلات فقط</option>

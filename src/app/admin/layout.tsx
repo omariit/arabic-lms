@@ -28,7 +28,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   let chatUnread = 0;
   try {
-    chatUnread = await db.conversation.count({ where: { staffUnread: { gt: 0 } } });
+    const [chats, lessons] = await Promise.all([
+      db.conversation.count({ where: { staffUnread: { gt: 0 } } }),
+      db.lessonThread.count({ where: { staffUnread: { gt: 0 } } }),
+    ]);
+    chatUnread = chats + lessons;
   } catch { /* cold start */ }
 
   const nav = NAV.filter((n) => {

@@ -13,6 +13,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (body.access === "FREE_PREVIEW" || body.access === "ENROLLED") data.access = body.access;
   if (body.position !== undefined) data.position = Number(body.position);
   if (body.duration !== undefined) data.duration = Math.max(0, Number(body.duration) || 0);
+  if (typeof body.description === "string") data.description = body.description.slice(0, 5000);
+  if (typeof body.scriptText === "string") data.scriptText = body.scriptText.slice(0, 20000);
+  if (typeof body.assignmentTitle === "string") data.assignmentTitle = body.assignmentTitle.trim() || null;
+  if (typeof body.assignmentInstructions === "string") data.assignmentInstructions = body.assignmentInstructions.slice(0, 5000);
   const lesson = await db.lesson.update({ where: { id }, data });
   return NextResponse.json({ lesson });
 }

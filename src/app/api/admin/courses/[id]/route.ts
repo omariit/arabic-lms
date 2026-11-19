@@ -8,8 +8,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const data: Record<string, unknown> = {};
-  for (const k of ["title", "description", "level", "coverColor"]) {
-    if (typeof body[k] === "string") data[k] = body[k];
+  for (const k of ["title", "description", "level", "coverColor", "weeklyMeetings"]) {
+    if (typeof body[k] === "string") data[k] = (body[k] as string).slice(0, 3000);
   }
   if (body.price !== undefined) data.price = Math.max(0, Number(body.price) || 0);
   if (body.published !== undefined) data.published = Boolean(body.published);

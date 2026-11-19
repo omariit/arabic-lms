@@ -45,6 +45,7 @@ model User {
   attendanceLogs     AttendanceLog[]
   conversations      Conversation[]
   pushSubscriptions  PushSubscription[]
+  lessonThreads      LessonThread[]
 
   @@index([role])
 }
@@ -184,6 +185,7 @@ model Course {
   liveSessions      LiveSession[]
   vouchers          Voucher[]
   prices            CoursePrice[]
+  weeklyMeetings    String        @db.Text @default("") // multiline, e.g. "الثلاثاء 6:00 م"
 
   @@index([published])
 }
@@ -227,10 +229,52 @@ model Lesson {
   youtubeId String // stored server-side; never exposed raw to clients
   duration  Int         @default(0) // seconds
   position  Int         @default(0)
+  description String   @db.Text @default("") // lesson content shown under the video
+  scriptText  String   @db.Text @default("") // lesson script/transcript
+  assignmentTitle String?
+  assignmentInstructions String @db.Text @default("") // empty = no assignment
 
-  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  module  Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  threads LessonThread[]
 
   @@index([moduleId, position])
+}
+
+// ---------- Per-lesson private assignment threads (Udemy-style) ----------
+
+// One private thread per (lesson, student). The student sees only her own
+// thread; the teacher opens the lesson and sees every student's thread.
+model LessonThread {
+  id            String   @id @default(cuid())
+  lessonId      String
+  studentId     String
+  staffUnread   Int      @default(0) // new student messages not yet read by staff
+  studentUnread Int      @default(0) // new staff replies not yet read by student
+  assignedToId  String?
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  lesson   Lesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student  User            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  messages LessonMessage[]
+
+  @@unique([lessonId, studentId])
+  @@index([lessonId, lastMessageAt])
+}
+
+model LessonMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  senderId  String
+  senderRole Role
+  body      String   @db.Text
+  audioKey  String?  // optional voice note (R2 object key)
+  audioMime String?
+  createdAt DateTime @default(now())
+
+  thread LessonThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
 }
 
 // ---------- Enrollment & payments ----------

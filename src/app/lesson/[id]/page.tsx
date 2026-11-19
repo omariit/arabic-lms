@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireStudent } from "@/lib/auth";
 import { ProtectedPlayer } from "@/components/protected-player";
+import { LessonWorkspace } from "./lesson-workspace";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,8 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
     );
   }
 
+  const hasWorkspace = !!enrollment; // enrolled students get the assignment workspace + private thread
+
   return (
     <main className="mx-auto max-w-3xl px-4 pb-20 pt-6">
       <p className="mb-2 text-xs text-gray-500">
@@ -44,6 +47,17 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
       <p className="mt-3 rounded-xl bg-brand-50 p-3 text-xs text-brand-800">
         🛡️ هذا الدرس محمي بعلامة مائية باسمك ورقم هاتفك — محاولات التسريب تُسجَّل وتؤدي لإيقاف الحساب.
       </p>
+
+      {hasWorkspace && (
+        <LessonWorkspace
+          lessonId={lesson.id}
+          initialAssignment={
+            lesson.assignmentTitle
+              ? { title: lesson.assignmentTitle, instructions: lesson.assignmentInstructions }
+              : null
+          }
+        />
+      )}
 
       <div className="mt-6 text-center">
         <Link href={`/courses/${lesson.module.courseId}`} className="text-sm font-bold text-brand-600 underline">

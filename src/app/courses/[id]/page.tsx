@@ -101,6 +101,9 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
             {price === 0 ? priceLabel : `${priceLabel} ${monthly}`}
           </span>
           <span className="rounded-full bg-white/20 px-3 py-1 font-bold">{course._count.enrollments} {ar ? "طالبة" : "students"}</span>
+          {course.weeklyMeetings && (
+            <span className="rounded-full bg-white/15 px-3 py-1 font-bold">🗓 {ar ? "لقاءات أسبوعية" : "weekly live meetings"}</span>
+          )}
           {override && (
             <span className="rounded-full bg-white/20 px-3 py-1 font-bold">
               🌍 {countryName(viewer, locale)}
@@ -130,6 +133,12 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-extrabold">{ar ? "📖 محتوى الدورة" : "📖 Curriculum"}</h2>
+        {course.weeklyMeetings && (
+          <div className="mb-4 rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-extrabold text-emerald-900">🗓 {ar ? "جدول اللقاءات الأسبوعية المباشرة" : "Weekly live meetings schedule"}</p>
+            <p className="mt-1 whitespace-pre-line text-sm leading-7 text-emerald-900/75">{course.weeklyMeetings}</p>
+          </div>
+        )}
         {course.modules.length === 0 && (
           <Card><CardContent className="text-center text-gray-500">{ar ? "لم تُضف دروس بعد" : "No lessons yet"}</CardContent></Card>
         )}
