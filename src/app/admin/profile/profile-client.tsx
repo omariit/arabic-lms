@@ -7,6 +7,7 @@ import { Card, CardContent, Input, Label, Textarea, Badge } from "@/components/u
 type Profile = {
   displayName: string; title: string; bio: string; methodology: string;
   achievements: string; photoUrl?: string; cliqAlias?: string; bankHint?: string;
+  whatsappNumber?: string;
 };
 
 /** Teacher profile + YouTube channel OAuth connect (needed for one-click live). */
@@ -31,9 +32,12 @@ export function ProfileClient() {
     if (!profile) return;
     setBusy(true); setMsg(null);
     try {
+      // Normalize the WhatsApp number server-side-friendly: strip to wa.me digits.
+      const digits = (profile.whatsappNumber ?? "").replace(/\D/g, "").replace(/^00/, "");
+      const payload = { ...profile, whatsappNumber: digits || "" };
       const res = await fetch("/api/admin/profile", {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("فشل الحفظ");
       setMsg({ ok: true, text: "تم الحفظ ✓" });
@@ -84,6 +88,11 @@ export function ProfileClient() {
           <div><Label>منهجيتي في التعليم</Label><Textarea value={profile.methodology} onChange={set("methodology")} /></div>
           <div><Label>الإنجازات (سطر لكل إنجاز)</Label><Textarea value={profile.achievements} onChange={set("achievements")} /></div>
           <div><Label>CliQ Alias (لطلبات التسجيل)</Label><Input dir="ltr" value={profile.cliqAlias ?? ""} onChange={set("cliqAlias")} /></div>
+          <div>
+            <Label>💬 رقم واتساب الإدارة (يظهر للطالبات)</Label>
+            <Input dir="ltr" inputMode="tel" placeholder="00962 7xxxxxxx أو 9627xxxxxxx" value={profile.whatsappNumber ?? ""} onChange={set("whatsappNumber")} />
+            <p className="mt-1 text-[11px] text-gray-400">اكتبيه بأي صيغة — يُطبَّع تلقائيًا إلى رابط wa.me عند الحفظ</p>
+          </div>
           <div><Label>ملاحظة تحويل بنكي</Label><Input value={profile.bankHint ?? ""} onChange={set("bankHint")} /></div>
 
           <Button size="lg" className="w-full" onClick={save} disabled={busy}>{busy ? "…" : "حفظ"}</Button>

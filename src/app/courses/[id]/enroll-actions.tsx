@@ -4,13 +4,17 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, Input, Label, Textarea } from "@/components/ui/primitives";
 
-/** Enrollment CTA: CliQ/bank receipt request OR single-use voucher code. */
-export function EnrollActions({ courseId, price, pendingRequest, cliqAlias, bankHint }: {
+/** Paid-enrollment flow: shows country-specific price + financial details + WhatsApp, then receipt reference. */
+export function EnrollActions({ courseId, price, currency, monthly, viewerCountry, pendingRequest, cliqAlias, bankHint, waHref }: {
   courseId: string;
   price: number;
+  currency: string;
+  monthly: string;
+  viewerCountry: string;
   pendingRequest: boolean;
   cliqAlias?: string | null;
   bankHint?: string | null;
+  waHref?: string | null;
 }) {
   const [tab, setTab] = useState<"request" | "voucher">("request");
   const [receiptRef, setReceiptRef] = useState("");
@@ -19,6 +23,8 @@ export function EnrollActions({ courseId, price, pendingRequest, cliqAlias, bank
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const priceLine = price === 0 ? "مجانية" : currency === "$" ? `$${price}` : `${price} ${currency}`;
+
   const submitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true); setMsg(null);
@@ -26,7 +32,7 @@ export function EnrollActions({ courseId, price, pendingRequest, cliqAlias, bank
       const res = await fetch("/api/student/enroll-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId, receiptRef, note }),
+        body: JSON.stringify({ courseId, receiptRef, note, expectedPrice: price, countryCode: viewerCountry }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -57,8 +63,30 @@ export function EnrollActions({ courseId, price, pendingRequest, cliqAlias, bank
   };
 
   return (
-    <Card className="border-brand-200">
+    <Card className="border-emerald-200">
       <CardContent>
+        {/* Payment box — shown first: choosing the course requires payment */}
+        {price > 0 && (
+          <div className="mb-4 rounded-2xl bg-emerald-50 p-4">
+            <p className="text-sm font-extrabold text-emerald-900">
+              💳 بيانات الدفع — {priceLine} {monthly}
+            </p>
+            {cliqAlias ? (
+              <p className="mt-2 rounded-lg bg-white p-2.5 text-sm font-bold" dir="ltr">CliQ / CLiQ Alias: <span className="text-emerald-700">{cliqAlias}</span></p>
+            ) : bankHint ? (
+              <p className="mt-2 rounded-lg bg-white p-2.5 text-sm">{bankHint}</p>
+            ) : (
+              <p className="mt-2 text-xs text-emerald-800/70">ستصلك بيانات التحويل من الإدارة عبر واتساب بعد اختيار الدورة</p>
+            )}
+            {waHref && (
+              <a href={waHref} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block">
+                <Button size="sm" className="bg-[#25D366] hover:bg-[#1ebe57]">💬 تواصلي مع الإدارة على واتساب</Button>
+              </a>
+            )}
+            <p className="mt-2 text-[11px] text-emerald-800/60">بعد الدفع: أرسلي رقم الإيصال هنا، وتفعّل حسابك بعد موافقة المعلمة</p>
+          </div>
+        )}
+
         <div className="mb-4 flex gap-2">
           <Button size="sm" variant={tab === "request" ? "default" : "outline"} onClick={() => setTab("request")}>إيصال تحويل</Button>
           <Button size="sm" variant={tab === "voucher" ? "default" : "outline"} onClick={() => setTab("voucher")}>كوبون</Button>
@@ -70,12 +98,6 @@ export function EnrollActions({ courseId, price, pendingRequest, cliqAlias, bank
               <p className="rounded-lg bg-amber-50 p-3 text-sm font-bold text-amber-700">⏳ طلبك قيد المراجعة</p>
             ) : (
               <form onSubmit={submitRequest} className="space-y-3">
-                {price > 0 && (cliqAlias || bankHint) && (
-                  <div className="rounded-lg bg-brand-50 p-3 text-xs leading-6 text-brand-900">
-                    {cliqAlias && <p><b>CliQ:</b> {cliqAlias}</p>}
-                    {bankHint && <p><b>ملاحظة:</b> {bankHint}</p>}
-                  </div>
-                )}
                 <div>
                   <Label htmlFor="receipt">مرجع الإيصال / رقم الحوالة</Label>
                   <Input id="receipt" value={receiptRef} onChange={(e) => setReceiptRef(e.target.value)} required />

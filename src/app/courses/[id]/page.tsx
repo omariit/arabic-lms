@@ -1,26 +1,48 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { viewerCountry, currencyFor } from "@/lib/pricing";
+import { countryName } from "@/lib/phone";
+import { getLocale, waLink } from "@/lib/i18n";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { buttonVariants } from "@/components/ui/button";
 import { cn, formatSeconds } from "@/lib/utils";
 import { EnrollActions } from "./enroll-actions";
 
-/** Course detail: curriculum with free-preview lessons + enrollment actions. */
+/** Course detail: country-aware monthly price, curriculum, and paid-enrollment flow. */
 export default async function CoursePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const locale = await getLocale();
+  const ar = locale === "ar";
   const user = await getCurrentUser();
+  const h = await headers();
+  const viewer = viewerCountry({
+    headerCountry: h.get("cf-ipcountry") ?? h.get("x-country"),
+    userCountry: user?.countryCode ?? null,
+  });
+
   const course = await db.course.findUnique({
     where: { id },
     include: {
       modules: { orderBy: { position: "asc" }, include: { lessons: { orderBy: { position: "asc" } } } },
       exams: { select: { id: true, title: true, type: true }, where: { published: true } },
+      prices: true,
       _count: { select: { enrollments: { where: { status: "ACTIVE" } } } },
     },
   });
   if (!course) {
-    return <main className="mx-auto max-w-3xl px-4 py-16 text-center">الدورة غير موجودة</main>;
+    return <main className="mx-auto max-w-3xl px-4 py-16 text-center">{ar ? "الدورة غير موجودة" : "Course not found"}</main>;
   }
+
+  // Monthly price: country override → default (JOD).
+  const override = course.prices.find((p) => p.countryCode === viewer && p.price !== course.price);
+  const price = override ? override.price : course.price;
+  const currency = override ? currencyFor(viewer) : ar ? "دينار" : "JOD";
+  const priceLabel = price === 0
+    ? (ar ? "مجانية" : "Free")
+    : currency === "$" ? `$${price}` : `${price} ${currency}`;
+  const monthly = ar ? "/ شهريًا" : "/ month";
 
   const enrollment = user
     ? await db.enrollment.findFirst({ where: { userId: user.id, courseId: course.id, status: "ACTIVE" } })
@@ -32,6 +54,12 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
   const isEnrolled = Boolean(enrollment);
   const canWatch = (access: string) => access === "FREE_PREVIEW" || (user && isEnrolled);
 
+  const wa = teacherProfile?.whatsappNumber?.replace(/\D/g, "");
+  const waMsg = ar
+    ? `مرحبًا، أنا ${user?.fullName ?? "طالبة جديدة"} — أرغب بالالتحق بدورة «${course.title}» (السعر: ${priceLabel}${price > 0 ? " " + monthly : ""}). ما هي بيانات التحويل المالية؟`
+    : `Hello, I'm ${user?.fullName ?? "a new student"} — I'd like to join "${course.title}" (price: ${priceLabel}${price > 0 ? " " + monthly : ""}). Could you share the payment details?`;
+  const waHref = wa ? waLink(wa, waMsg) : null;
+
   return (
     <main className="mx-auto max-w-3xl px-4 pb-20 pt-6">
       <div className="rounded-3xl p-6 text-white shadow" style={{ background: course.coverColor }}>
@@ -39,20 +67,31 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
         <p className="mt-2 text-sm leading-7 text-white/90">{course.description}</p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <span className="rounded-full bg-white/20 px-3 py-1 font-bold">{course.level}</span>
-          <span className="rounded-full bg-white/20 px-3 py-1 font-bold">{course.price === 0 ? "مجانية" : `${course.price} دينار`}</span>
-          <span className="rounded-full bg-white/20 px-3 py-1 font-bold">{course._count.enrollments} طالبة</span>
+          <span className="rounded-full bg-amber-300/90 px-3 py-1 font-extrabold text-emerald-950">
+            {price === 0 ? priceLabel : `${priceLabel} ${monthly}`}
+          </span>
+          <span className="rounded-full bg-white/20 px-3 py-1 font-bold">{course._count.enrollments} {ar ? "طالبة" : "students"}</span>
+          {override && (
+            <span className="rounded-full bg-white/20 px-3 py-1 font-bold">
+              🌍 {countryName(viewer, locale)}
+            </span>
+          )}
         </div>
       </div>
 
       {!isEnrolled && (
         <div className="mt-4">
           {user ? (
-            <EnrollActions courseId={course.id} price={course.price} pendingRequest={Boolean(pendingRequest)}
-              cliqAlias={teacherProfile?.cliqAlias} bankHint={teacherProfile?.bankHint} />
+            <EnrollActions courseId={course.id} price={price} currency={currency} monthly={monthly}
+              viewerCountry={viewer} pendingRequest={Boolean(pendingRequest)}
+              cliqAlias={teacherProfile?.cliqAlias} bankHint={teacherProfile?.bankHint}
+              waHref={waHref} />
           ) : (
-            <Card className="border-brand-200">
+            <Card className="border-emerald-200">
               <CardContent className="py-4 text-center">
-                <Link href="/login" className={cn(buttonVariants({ size: "lg" }), "w-full")}>سجّلي الدخول للانضمام</Link>
+                <Link href="/login" className={cn(buttonVariants({ size: "lg" }), "w-full")}>
+                  {ar ? "سجّلي الدخول للانضمام" : "Log in to join"}
+                </Link>
               </CardContent>
             </Card>
           )}
@@ -60,16 +99,16 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
       )}
 
       <section className="mt-8">
-        <h2 className="mb-3 text-lg font-extrabold">📖 محتوى الدورة</h2>
+        <h2 className="mb-3 text-lg font-extrabold">{ar ? "📖 محتوى الدورة" : "📖 Curriculum"}</h2>
         {course.modules.length === 0 && (
-          <Card><CardContent className="text-center text-gray-500">لم تُضف دروس بعد</CardContent></Card>
+          <Card><CardContent className="text-center text-gray-500">{ar ? "لم تُضف دروس بعد" : "No lessons yet"}</CardContent></Card>
         )}
         <div className="space-y-4">
           {course.modules.map((m) => (
             <Card key={m.id}>
               <CardHeader><CardTitle>{m.title}</CardTitle></CardHeader>
-              <CardContent className="divide-y divide-brand-50">
-                {m.lessons.length === 0 && <p className="py-2 text-sm text-gray-400">لا دروس في هذا الوحدة</p>}
+              <CardContent className="divide-y divide-emerald-50">
+                {m.lessons.length === 0 && <p className="py-2 text-sm text-gray-400">{ar ? "لا دروس في هذه الوحدة" : "No lessons in this module"}</p>}
                 {m.lessons.map((l) => (
                   <div key={l.id} className="flex items-center justify-between gap-3 py-3">
                     <div className="flex items-center gap-3">
@@ -80,11 +119,11 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
                       </div>
                     </div>
                     {canWatch(l.access) ? (
-                      <Link href={`/lesson/${l.id}`} className={cn(buttonVariants({ size: "sm" }))}>مشاهدة</Link>
+                      <Link href={`/lesson/${l.id}`} className={cn(buttonVariants({ size: "sm" }))}>{ar ? "مشاهدة" : "Watch"}</Link>
                     ) : l.access === "FREE_PREVIEW" ? (
-                      <Link href={`/lesson/${l.id}`} className={cn(buttonVariants({ size: "sm", variant: "secondary" }))}>تجريبي</Link>
+                      <Link href={`/lesson/${l.id}`} className={cn(buttonVariants({ size: "sm", variant: "secondary" }))}>{ar ? "تجريبي" : "Trial"}</Link>
                     ) : (
-                      <Badge tone="gray">للمسجلات</Badge>
+                      <Badge tone="gray">{ar ? "للمسجلات" : "Enrolled"}</Badge>
                     )}
                   </div>
                 ))}
@@ -96,7 +135,7 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
 
       {course.exams.length > 0 && isEnrolled && (
         <section className="mt-8">
-          <h2 className="mb-3 text-lg font-extrabold">📝 الاختبارات</h2>
+          <h2 className="mb-3 text-lg font-extrabold">{ar ? "📝 الاختبارات" : "📝 Exams"}</h2>
           <div className="flex flex-wrap gap-2">
             {course.exams.map((e) => (
               <Link key={e.id} href={`/exam/${e.id}`} className={cn(buttonVariants({ size: "sm", variant: "secondary" }))}>
@@ -108,7 +147,9 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
       )}
 
       <div className="mt-10 text-center">
-        <Link href="/dashboard" className="text-sm font-bold text-brand-600 underline">→ لوحة الطالبة</Link>
+        <Link href="/dashboard" className="text-sm font-bold text-emerald-700 underline">
+          {ar ? "→ لوحة الطالبة" : "→ Student dashboard"}
+        </Link>
       </div>
     </main>
   );

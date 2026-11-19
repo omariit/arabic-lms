@@ -27,7 +27,8 @@ enum ViolationType {
 model User {
   id           String        @id @default(cuid())
   fullName     String
-  phone        String        @unique // used for login + watermark identity
+  phone        String        @unique // normalized E.164 (+9627...); used for login + watermark identity
+  countryCode  String        @default("JO") // ISO 3166 alpha-2; drives pricing + currency display
   passwordHash String
   role         Role          @default(STUDENT)
   createdAt    DateTime      @default(now())
@@ -89,6 +90,7 @@ model TeacherProfile {
   photoUrl     String?
   cliqAlias    String? // CliQ/bank transfer alias for enrollment receipts
   bankHint     String?
+  whatsappNumber String? // normalized wa.me digits (no +/00) for the public "تواصل مع الإدارة" button
   updatedAt    DateTime @updatedAt
 }
 
@@ -108,7 +110,7 @@ model Course {
   id          String     @id @default(cuid())
   title       String
   description String     @db.Text
-  price       Int        @default(0) // whole currency units; 0 = free
+  price       Int        @default(0) // DEFAULT monthly price; 0 = free; overridden per country via CoursePrice
   level       String     @default("عام")
   published   Boolean    @default(false)
   coverColor  String     @default("#1d5fe0")
@@ -121,8 +123,23 @@ model Course {
   exams             Exam[]
   liveSessions      LiveSession[]
   vouchers          Voucher[]
+  prices            CoursePrice[]
 
   @@index([published])
+}
+
+// Per-country monthly price overrides (e.g. cheaper for Jordan, USD for USA)
+model CoursePrice {
+  id          String @id @default(cuid())
+  courseId    String
+  countryCode String // ISO 3166 alpha-2
+  price       Int
+  createdAt   DateTime @default(now())
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, countryCode])
+  @@index([countryCode])
 }
 
 model Module {

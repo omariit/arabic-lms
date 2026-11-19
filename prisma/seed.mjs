@@ -56,6 +56,7 @@ async function main() {
           "إجازة في القراءات العشر من طريقي الشاطبية والدرة بالسند المتصل\nمسندة إجازة لطالبات في المستويات الثلاثة\nإجازة في حفظ القرآن الكريم كاملًا\nخبرة أكثر من ١٥ عامًا في تعليم القرآن للنساء",
         cliqAlias: "",
         bankHint: "",
+        whatsappNumber: "",
       },
     });
     console.log("✔ Quran-teacher profile seeded");
@@ -98,19 +99,36 @@ async function main() {
     console.log("✔ Sample testimonials seeded");
   }
 
-  const existingCourse = await db.course.findFirst({ where: { title: "مقدمة في الرياضيات" } });
-  if (!existingCourse) {
+    // ── Courses: دورة الإتقان + دورة الإجازة (المستوى الثالث) — 30 دينار شهريًا ──
+  const COURSES = [
+    {
+      title: "دورة إتقان القراءة — المستوى الأول",
+      description: "تأسيس الطالبة على النطق الصحيح وتلاوة القرآن الكريم بأحكام التجويد، مع متابعة فردية أسبوعية وتصحيح صوتي مستمر.",
+      level: "المستوى الأول",
+      color: "#0b7a5c",
+    },
+    {
+      title: "دورة الإجازة — المستوى الثالث",
+      description: "الإجازة في القراءة المتواترة بالسند المتصل إلى رسول الله ﷺ: تسميع دقيق، توثيق السند، ومتابعة حتى الإتقان الكامل.",
+      level: "المستوى الثالث",
+      color: "#8a6d1f",
+    },
+  ];
+  for (const c of COURSES) {
+    const existing = await db.course.findFirst({ where: { title: c.title } });
+    if (existing) continue;
     const course = await db.course.create({
       data: {
-        title: "إتقان القراءة والتجويد — المستوى الأول",
-        description: "تأسيس الطالبة على النطق الصحيح وتلاوة القرآن الكريم بأحكام التجويد، مع متابعة فردية أسبوعية وتصحيح صوتي مستمر.",
-        price: 0,
-        level: "المستوى الأول",
+        title: c.title,
+        description: c.description,
+        price: 30, // default monthly price (JOD)
+        level: c.level,
         published: true,
+        coverColor: c.color,
       },
     });
     const module = await db.module.create({
-      data: { courseId: course.id, title: "الوحدة الأولى: مخارج الحروف وأحكام التجويد", position: 0 },
+      data: { courseId: course.id, title: "الوحدة الأولى: التأسيس", position: 0 },
     });
     await db.lesson.create({
       data: {
@@ -121,7 +139,18 @@ async function main() {
         position: 0,
       },
     });
-    console.log("✔ Sample course seeded");
+    console.log(`✔ Seeded course: ${c.title} (30 JOD/month)`);
+  }
+
+  // Sample per-country pricing: USA pays in USD via override.
+  const itqan = await db.course.findFirst({ where: { title: "دورة إتقان القراءة — المستوى الأول" } });
+  if (itqan) {
+    await db.coursePrice.upsert({
+      where: { courseId_countryCode: { courseId: itqan.id, countryCode: "US" } },
+      update: { price: 45 },
+      create: { courseId: itqan.id, countryCode: "US", price: 45 },
+    });
+    console.log("✔ Sample US pricing override: $45/month");
   }
 }
 

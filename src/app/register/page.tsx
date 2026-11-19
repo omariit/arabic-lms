@@ -4,11 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, Input, Label } from "@/components/ui/primitives";
+import { Card, CardContent, Input, Label, Select } from "@/components/ui/primitives";
+import { COUNTRIES } from "@/lib/phone";
+import { LangSwitcher } from "@/components/lang-switcher";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
+  const [country, setCountry] = useState("JO");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +25,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, phone, password }),
+        body: JSON.stringify({ fullName, phone, password, countryCode: country }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "فشل التسجيل");
@@ -37,6 +40,9 @@ export default function RegisterPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4">
+      <div className="mb-4 flex justify-center">
+        <LangSwitcher current={(typeof document !== "undefined" && (document.cookie.match(/lang=(en|ar)/)?.[1] as "en" | "ar")) || "ar"} />
+      </div>
       <Card>
         <CardContent className="p-6">
           <h1 className="mb-1 text-center text-2xl font-extrabold">حساب جديد</h1>
@@ -47,8 +53,17 @@ export default function RegisterPage() {
               <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required minLength={3} />
             </div>
             <div>
+              <Label htmlFor="country">الدولة</Label>
+              <Select id="country" value={country} onChange={(e) => setCountry(e.target.value)}>
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>{c.nameAr} (+{c.dial})</option>
+                ))}
+              </Select>
+            </div>
+            <div>
               <Label htmlFor="phone">رقم الهاتف</Label>
-              <Input id="phone" dir="ltr" inputMode="tel" placeholder="07xxxxxxxx" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+              <Input id="phone" dir="ltr" inputMode="tel" placeholder="0787262186" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+              <p className="mt-1 text-[11px] text-gray-400">يكتبين الرقم كما تعرفينه — سنضيف مفتاح الدولة تلقائيًا</p>
             </div>
             <div>
               <Label htmlFor="password">كلمة المرور</Label>

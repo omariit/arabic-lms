@@ -10,7 +10,7 @@ import {
 } from "@/lib/crypto";
 import type { Role } from "@prisma/client";
 
-export type SessionUser = { id: string; role: Role; fullName: string; phone: string };
+export type SessionUser = { id: string; role: Role; fullName: string; phone: string; countryCode: string };
 
 export async function clientMeta() {
   const h = await headers();
@@ -87,10 +87,10 @@ export async function getCurrentUser(opts?: { allowFresh?: boolean }): Promise<S
 
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, role: true, fullName: true, phone: true },
+    select: { id: true, role: true, fullName: true, phone: true, countryCode: true },
   });
   if (!user) return null;
-  return { id: user.id, role: user.role, fullName: user.fullName, phone: user.phone };
+  return { id: user.id, role: user.role, fullName: user.fullName, phone: user.phone, countryCode: user.countryCode };
 }
 
 export async function requireUser(): Promise<SessionUser> {

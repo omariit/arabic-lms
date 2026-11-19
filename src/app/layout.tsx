@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo, Tajawal } from "next/font/google";
+import { getLocale, dir } from "@/lib/i18n";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -16,7 +17,7 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "منصة المعلمة | تعليم أونلاين",
+  title: "منصة المعلمة | تعليم أونلاين — Quran Itqan Platform",
   description: "منصة تعليمية عربية متكاملة: دروس مسجلة، حصص مباشرة، واختبارات إلكترونية وصوتية",
   manifest: "/manifest.json",
 };
@@ -28,9 +29,10 @@ export const viewport: Viewport = {
   themeColor: "#1d5fe0",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
   return (
-    <html lang="ar" dir="rtl" className={`${cairo.variable} ${tajawal.variable}`}>
+    <html lang={locale} dir={dir(locale)} className={`${cairo.variable} ${tajawal.variable}`}>
       <body className="font-sans">{children}</body>
     </html>
   );

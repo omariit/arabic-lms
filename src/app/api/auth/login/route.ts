@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { clientMeta } from "@/lib/auth";
-import { fingerprintFrom } from "@/lib/crypto";
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { loginVariants } from "@/lib/phone";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
@@ -15,13 +15,24 @@ export async function POST(req: Request) {
     return rateLimitResponse(rl.retryAfter);
   }
 
-  const { phone, password } = await req.json().catch(() => ({}) as never) as { phone?: string; password?: string };
-  if (!phone || !password) {
+  const body = (await req.json().catch(() => ({}))) as {
+    phone?: string; password?: string; countryCode?: string;
+  };
+  if (!body.phone || !body.password) {
     return NextResponse.json({ error: "يرجى إدخال رقم الهاتف وكلمة المرور" }, { status: 400 });
   }
 
-  const user = await db.user.findUnique({ where: { phone } });
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  // The stored phone is normalized E.164; the user may type any familiar form
+  // (0787262186, 787262186, 00962787262186, +962787262186).
+  const variants = loginVariants(body.phone, body.countryCode || "JO");
+  let user = null;
+  for (const candidate of variants) {
+    const found = await db.user.findFirst({
+      where: { phone: { in: [candidate, candidate.replace(/^\+/, ""), `+${candidate.replace(/^\+/, "")}`] } },
+    });
+    if (found) { user = found; break; }
+  }
+  if (!user || !(await bcrypt.compare(body.password, user.passwordHash))) {
     return NextResponse.json({ error: "رقم الهاتف أو كلمة المرور غير صحيحة" }, { status: 401 });
   }
 

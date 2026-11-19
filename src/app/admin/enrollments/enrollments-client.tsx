@@ -12,12 +12,28 @@ export function EnrollmentsClient() {
   } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const [fin, setFin] = useState<{ cliqAlias: string; bankHint: string }>({ cliqAlias: "", bankHint: "" });
+
   const load = async () => {
     setBusy(true);
     try {
       const res = await fetch("/api/admin/enrollments");
       setData(await res.json());
+      const pRes = await fetch("/api/admin/profile");
+      if (pRes.ok) {
+        const p = await pRes.json();
+        setFin({ cliqAlias: p.profile?.cliqAlias ?? "", bankHint: p.profile?.bankHint ?? "" });
+      }
     } finally { setBusy(false); }
+  };
+  const cliqAliasText = fin.cliqAlias;
+  const bankHintText = fin.bankHint;
+
+  const waStudent = (r: { user: { fullName: string; phone: string }; course: { title: string } }) => {
+    // wa.me digits: stored E.164 (+9627...) → strip non-digits.
+    const digits = r.user.phone.replace(/\D/g, "");
+    const text = `مرحبًا ${r.user.fullName} 🌙\nبخصوص التسجيل في «${r.course.title}»:\nالبيانات المالية للتحويل:\n${cliqAliasText ? "• CliQ: " + cliqAliasText + "\n" : ""}${bankHintText ? "• " + bankHintText + "\n" : ""}بعد التحويل أرسلي لنا رقم الإيصال ليتم تفعيل التسجيل ✅`;
+    return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
   };
 
   const decide = async (requestId: string, action: "APPROVE" | "REJECT") => {
@@ -56,6 +72,9 @@ export function EnrollmentsClient() {
                     <Button size="lg" variant="success" className="flex-1" onClick={() => decide(r.id, "APPROVE")} disabled={busy}>✓ موافقة</Button>
                     <Button size="lg" variant="destructive" className="flex-1" onClick={() => decide(r.id, "REJECT")} disabled={busy}>✗ رفض</Button>
                   </div>
+                  <a href={waStudent(r)} target="_blank" rel="noopener noreferrer" className="mt-2 block">
+                    <Button size="lg" variant="secondary" className="w-full bg-[#25D366] text-white hover:bg-[#1ebe57]">💬 إرسال البيانات المالية للطالبة على واتساب</Button>
+                  </a>
                 </CardContent>
               </Card>
             ))}

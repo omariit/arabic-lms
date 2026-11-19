@@ -4,10 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, Input, Label } from "@/components/ui/primitives";
+import { Card, CardContent, Input, Label, Select } from "@/components/ui/primitives";
+import { COUNTRIES } from "@/lib/phone";
+import { LangSwitcher } from "@/components/lang-switcher";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const [country, setCountry] = useState("JO");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ phone, password, countryCode: country }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "فشل تسجيل الدخول");
@@ -34,16 +36,29 @@ export default function LoginPage() {
     }
   };
 
+  const router = useRouter();
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4">
+      <div className="mb-4 flex justify-center"><LangSwitcherWithFallback /></div>
       <Card>
         <CardContent className="p-6">
           <h1 className="mb-1 text-center text-2xl font-extrabold">تسجيل الدخول</h1>
           <p className="mb-6 text-center text-sm text-gray-500">بالهاتف وكلمة المرور — جلسة على جهاز واحد فقط</p>
           <form onSubmit={submit} className="space-y-4">
-            <div>
-              <Label htmlFor="phone">رقم الهاتف</Label>
-              <Input id="phone" dir="ltr" inputMode="tel" placeholder="07xxxxxxxx" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+            <div className="grid grid-cols-[1fr_2fr] gap-2">
+              <div>
+                <Label htmlFor="country">المفتاح</Label>
+                <Select id="country" value={country} onChange={(e) => setCountry(e.target.value)}>
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.nameAr} (+{c.dial})</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="phone">رقم الهاتف</Label>
+                <Input id="phone" dir="ltr" inputMode="tel" placeholder="0787262186" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+              </div>
             </div>
             <div>
               <Label htmlFor="password">كلمة المرور</Label>
@@ -61,4 +76,8 @@ export default function LoginPage() {
       </Card>
     </main>
   );
+}
+
+function LangSwitcherWithFallback() {
+  return <LangSwitcher current={(typeof document !== "undefined" && (document.cookie.match(/lang=(en|ar)/)?.[1] as "en" | "ar")) || "ar"} />;
 }

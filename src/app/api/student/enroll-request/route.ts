@@ -11,7 +11,9 @@ export async function POST(req: Request) {
   const rl = rateLimit(`enrollreq:${user.id}`, 5, 60_000);
   if (!rl.ok) return rateLimitResponse(rl.retryAfter);
 
-  const body = (await req.json().catch(() => ({}))) as { courseId?: string; receiptRef?: string; note?: string };
+  const body = (await req.json().catch(() => ({}))) as {
+    courseId?: string; receiptRef?: string; note?: string; expectedPrice?: number; countryCode?: string;
+  };
   if (!body.courseId || !body.receiptRef?.trim()) {
     return NextResponse.json({ error: "مرجع الإيصال مطلوب" }, { status: 400 });
   }
@@ -23,12 +25,15 @@ export async function POST(req: Request) {
   });
   if (existing) return NextResponse.json({ error: "لديك طلب قيد المراجعة بالفعل" }, { status: 409 });
 
+  const priceLine = body.expectedPrice !== undefined
+    ? `[السعر المتوقع عند الطلب: ${body.expectedPrice} ${body.countryCode === "US" ? "USD" : "JOD"}]`
+    : "";
   const request = await db.enrollmentRequest.create({
     data: {
       userId: user.id,
       courseId: course.id,
       receiptRef: body.receiptRef.trim(),
-      note: body.note?.trim() || null,
+      note: [priceLine, body.note?.trim()].filter(Boolean).join(" ") || null,
     },
   });
   return NextResponse.json({ ok: true, requestId: request.id });
