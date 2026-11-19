@@ -330,10 +330,17 @@ export default async function LandingPage() {
             <p className="mb-2 text-xs font-extrabold tracking-widest text-amber-600 sm:text-sm">{d.statsKicker}</p>
             <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug text-emerald-950"><Rich text={d.statsTitle} /></h2>
           </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {stats.map(([value, label], i) => (
-              <StatCard key={i} value={<CountUp to={value} arabicIndic={ar} suffix={i === 3 ? "+" : ""} />} label={label} />
-            ))}
+          {totalStudents === 0 && (
+            <p className="mx-auto mb-6 w-max max-w-full rounded-full border border-amber-300 bg-amber-50 px-4 py-1.5 text-center text-[11px] font-extrabold text-amber-700 sm:text-xs">
+              🌱 {d.statsBeta}
+            </p>
+          )}
+          <div className={cn("grid grid-cols-2 gap-4", totalStudents > 0 ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+            {stats
+              .filter(([value]) => value > 0)
+              .map(([value, label], i) => (
+                <StatCard key={i} value={<CountUp to={value} arabicIndic={ar} suffix={i === stats.length - 1 ? "+" : ""} />} label={label} />
+              ))}
           </div>
         </div>
       </section>
@@ -348,11 +355,11 @@ export default async function LandingPage() {
             <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug text-emerald-950"><Rich text={d.howTitle} /></h2>
             {d.stepsSub && <p className="mt-3 text-sm leading-7 text-emerald-900/60">{d.stepsSub}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-4">
-            {(steps.length === 3 ? [...steps, { t: ar ? "ابدئي التلاوة" : "Start reciting", d: ar ? "من درسك التجريبي المجاني حتى الإجازة" : "From your free trial lesson to Ijazah" }] : steps).slice(0, 4).map((s, i) => (
+          <div className="grid grid-cols-1 gap-x-4 gap-y-10 sm:grid-cols-3">
+            {steps.map((s, i) => (
               <div key={s.t} className="text-center">
                 <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-b from-emerald-800 to-emerald-950 shadow-lg shadow-emerald-900/20">
-                  <span className="font-display text-2xl font-extrabold text-amber-300">{ar ? ["١", "٢", "٣", "٤"][i] : i + 1}</span>
+                  <span className="font-display text-2xl font-extrabold text-amber-300">{ar ? ["١", "٢", "٣"][i] : i + 1}</span>
                 </div>
                 <h3 className="mt-4 font-display text-sm font-extrabold text-emerald-950 sm:text-base">{s.t}</h3>
                 <p className="mx-auto mt-1.5 max-w-[14rem] text-xs leading-6 text-emerald-900/60">{s.d}</p>
