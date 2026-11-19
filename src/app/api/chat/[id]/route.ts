@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
+import { sendPushToUsers } from "@/lib/push";
 
 async function ownConversation(id: string, studentId: string) {
   const c = await db.conversation.findUnique({ where: { id } });
@@ -38,5 +39,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: { conversationId: id, senderId: user.id, senderRole: "STUDENT", body: text },
   });
   await db.conversation.update({ where: { id }, data: { lastMessageAt: new Date(), staffUnread: { increment: 1 } } });
+
+  // 🔔 notify staff (assigned handler first, otherwise all staff)
+  const staffIds = conv.assignedToId
+    ? [conv.assignedToId]
+    : (await db.user.findMany({ where: { role: { in: ["TEACHER", "ADMIN", "ASSISTANT"] } }, select: { id: true } })).map((u) => u.id);
+  sendPushToUsers(staffIds, {
+    title: "📨 رسالة جديدة من طالبة",
+    body: text.slice(0, 80),
+    url: "/admin/chat",
+    tag: `chat-${id}`,
+  }).catch(() => {});
+
   return NextResponse.json({ message });
 }

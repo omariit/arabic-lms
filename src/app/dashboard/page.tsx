@@ -6,6 +6,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn, formatDateAr } from "@/lib/utils";
 import { getLocale, t } from "@/lib/i18n";
 import { VoucherRedeem } from "./voucher-redeem";
+import { PushManager } from "@/components/push-manager";
+import { InstallPrompt } from "@/components/install-prompt";
 import { LogoutButton } from "@/components/logout-button";
 
 
@@ -54,6 +56,10 @@ export default async function StudentDashboard() {
         </div>
         <LogoutButton />
       </header>
+
+      {/* PWA: notifications + install */}
+      <PushManager label="تنبيهات مُقْرِئَة" />
+      <div className="mb-4"><InstallPrompt label="مُقْرِئَة" /></div>
 
       {/* Chat with the teacher's team */}
       <Link href="/dashboard/chat" className="mb-6 flex items-center justify-between rounded-2xl bg-gradient-to-l from-brand-700 to-brand-800 p-4 text-white shadow-md transition hover:shadow-lg">

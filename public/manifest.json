@@ -4,8 +4,8 @@
   "description": "منصة تعليمية عربية: دروس، حصص مباشرة، واختبارات",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f0f7ff",
-  "theme_color": "#1d5fe0",
+  "background_color": "#063529",
+  "theme_color": "#063529",
   "dir": "rtl",
   "lang": "ar",
   "icons": [
@@ -20,6 +20,32 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "categories": [
+    "education"
+  ],
+  "shortcuts": [
+    {
+      "name": "الدورات",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/logo-square.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "المحادثات",
+      "url": "/dashboard/chat",
+      "icons": [
+        {
+          "src": "/logo-square.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

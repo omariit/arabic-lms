@@ -44,6 +44,7 @@ model User {
   violations         SecurityViolation[]
   attendanceLogs     AttendanceLog[]
   conversations      Conversation[]
+  pushSubscriptions  PushSubscription[]
 
   @@index([role])
 }
@@ -55,6 +56,22 @@ model SiteContent {
   id        String   @id @default("landing")
   data      Json     // { sections: {key: bool}, texts: { ar: {key: string|list}, en: {...} } }
   updatedAt DateTime @updatedAt
+}
+
+// ---------- Push notifications (PWA) ----------
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique // browser push endpoint URL
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ---------- Student ↔ staff chat ----------

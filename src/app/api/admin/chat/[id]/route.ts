@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
+import { sendPushToUsers } from "@/lib/push";
 
 /** Staff: messages of a conversation (marks staffUnread = 0 = student messages read). */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -41,6 +42,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       ...(conv.assignedToId ? {} : { assignedToId: user.id }),
     },
   });
+
+  // 🔔 notify the student
+  sendPushToUsers([conv.studentId], {
+    title: "💬 رد جديد من فريق المعلمة",
+    body: text.slice(0, 80),
+    url: "/dashboard/chat",
+    tag: `chat-${id}`,
+  }).catch(() => {});
+
   return NextResponse.json({ message });
 }
 

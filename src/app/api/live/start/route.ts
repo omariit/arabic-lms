@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 import { createLiveBroadcast, broadcastAppUrl, endLiveBroadcast } from "@/lib/youtube";
+import { sendPushToUsers } from "@/lib/push";
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 /**
@@ -53,6 +54,21 @@ export async function POST(req: Request) {
       startedAt: new Date(),
     },
   });
+
+  // 🔔 notify every enrolled student that the live class just started
+  const enrolled = await db.enrollment.findMany({
+    where: { courseId: course.id, status: "ACTIVE" },
+    select: { userId: true },
+  });
+  sendPushToUsers(
+    enrolled.map((e) => e.userId),
+    {
+      title: "🔴 بدأت الحصة المباشرة",
+      body: `${live.title} — انضمي الآن`,
+      url: `/live/${live.id}`,
+      tag: `live-${live.id}`,
+    }
+  ).catch(() => {});
 
   return NextResponse.json({
     ok: true,

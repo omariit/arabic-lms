@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
+import { PushManager } from "@/components/push-manager";
+import { InstallPrompt } from "@/components/install-prompt";
 import { LogoutButton } from "@/components/logout-button";
 
 const NAV = [
@@ -48,7 +50,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       </header>
 
-      <div className="mx-auto max-w-3xl px-4 pt-4">{children}</div>
+      <div className="mx-auto max-w-3xl px-4 pt-4">
+        <PushManager label="تنبيهات مُقْرِئَة" />
+        <InstallPrompt label="مُقْرِئَة" />
+        {children}
+      </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-100 bg-white shadow-lg">
         <div className="mx-auto grid max-w-3xl" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>

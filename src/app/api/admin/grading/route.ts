@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
+import { sendPushToUsers } from "@/lib/push";
 import { r2Configured, newAudioKey, presignPut, presignGet } from "@/lib/r2";
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -90,6 +91,14 @@ export async function POST(req: Request) {
       status: "GRADED",
     },
   });
+
+  // 🔔 notify the student that her exam was graded
+  sendPushToUsers([attempt.userId], {
+    title: "📝 تم تصحيح اختبارك",
+    body: grade !== undefined ? `درجتك: ${grade}` : "اطلعي على ملاحظات المعلمة",
+    url: "/dashboard",
+    tag: `exam-${attempt.id}`,
+  }).catch(() => {});
 
   return NextResponse.json({ ok: true, voiceUpload });
 }
