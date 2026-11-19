@@ -1,6 +1,41 @@
 import { google } from "googleapis";
 import { db } from "@/lib/db";
 
+const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+
+/**
+ * Accept any YouTube form the teacher pastes — raw id, watch?v=, youtu.be/,
+ * shorts/, embed/, live/ — and return the 11-char video id ("" if invalid).
+ */
+export function parseYouTubeId(input: string): string {
+  let s = (input || "").trim();
+  if (!s) return "";
+  if (YT_ID_RE.test(s)) return s;
+  try {
+    // tolerate scheme-less inputs
+    if (!/^https?:\/\//i.test(s)) {
+      if (/^(www\.)?(youtube\.com|youtu\.be)/i.test(s)) s = "https://" + s;
+      else return "";
+    }
+    const u = new URL(s);
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    if (host === "youtu.be") {
+      const seg = u.pathname.split("/").filter(Boolean)[0] ?? "";
+      return YT_ID_RE.test(seg) ? seg : "";
+    }
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+      const v = u.searchParams.get("v");
+      if (v && YT_ID_RE.test(v)) return v;
+      const [head, seg] = u.pathname.split("/").filter(Boolean);
+      if ((head === "shorts" || head === "embed" || head === "live") && seg && YT_ID_RE.test(seg))
+        return seg;
+    }
+  } catch {
+    /* not a URL */
+  }
+  return "";
+}
+
 /** OAuth client configured for the teacher's YouTube channel (offline refresh token). */
 export function youtubeOAuthClient(redirectUri: string) {
   return new google.auth.OAuth2(

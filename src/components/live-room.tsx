@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 export type LiveRoomProps = {
   liveSessionId: string;
   lessonId: string | null; // live video is delivered through the same protected token flow
-  viewer: { role: "ADMIN" | "TEACHER" | "STUDENT"; name: string; phone: string };
+  viewer: { role: "ADMIN" | "TEACHER" | "STUDENT" | "ASSISTANT"; name: string; phone: string };
 };
 
 type HandEntry = { socketId: string; name: string };

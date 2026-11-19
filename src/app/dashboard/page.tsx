@@ -4,12 +4,18 @@ import { requireStudent } from "@/lib/auth";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { buttonVariants } from "@/components/ui/button";
 import { cn, formatDateAr } from "@/lib/utils";
+import { getLocale, t } from "@/lib/i18n";
 import { VoucherRedeem } from "./voucher-redeem";
 import { LogoutButton } from "@/components/logout-button";
 
-/** Student dashboard: enrollments, upcoming live classes, pending exams, voucher redeem. */
+/** Student dashboard: enrollments, upcoming live classes, pending exams, voucher redeem, chat. */
 export default async function StudentDashboard() {
   const user = await requireStudent();
+  const locale = await getLocale();
+  const d = await t();
+  const chatUnread = await db.conversation.count({
+    where: { studentId: user.id, studentUnread: { gt: 0 } },
+  }).catch(() => 0);
 
   const [enrollments, liveSessions, attempts] = await Promise.all([
     db.enrollment.findMany({
@@ -46,6 +52,22 @@ export default async function StudentDashboard() {
         </div>
         <LogoutButton />
       </header>
+
+      {/* Chat with the teacher's team */}
+      <Link href="/dashboard/chat" className="mb-6 flex items-center justify-between rounded-2xl bg-gradient-to-l from-brand-700 to-brand-800 p-4 text-white shadow-md transition hover:shadow-lg">
+        <span className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-xl">💬</span>
+          <span>
+            <span className="block text-sm font-extrabold">{d.chatTitle}</span>
+            <span className="block text-[11px] text-white/70">{d.chatKicker}</span>
+          </span>
+        </span>
+        {chatUnread > 0 && (
+          <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-amber-400 px-2 text-xs font-extrabold text-emerald-950">
+            {chatUnread.toLocaleString(locale === "ar" ? "ar-EG" : "en-US")}
+          </span>
+        )}
+      </Link>
 
       {/* Live now */}
       {liveSessions.length > 0 && (

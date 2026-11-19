@@ -7,6 +7,8 @@ import { viewerCountry, currencyFor } from "@/lib/pricing";
 import { buttonVariants } from "@/components/ui/button";
 import { LangSwitcher } from "@/components/lang-switcher";
 import { CountUp } from "@/components/count-up";
+import { Rich } from "@/components/rich";
+import { getSiteData, mergeDicts } from "@/lib/site-content";
 import { cn } from "@/lib/utils";
 import { LandingFallback } from "./landing-fallback";
 
@@ -79,61 +81,45 @@ async function loadLanding() {
   }
 }
 
-/* ─── atoms ─────────────────────────────────────────── */
+const LEVEL_ICONS = ["📖", "🌙", "📜"];
+const FEATURE_ICONS = ["🔴", "🎧", "🛡️", "📝", "📲", "🏆"];
 
-/** Yellow word-highlight (sanad-style) */
-function HL({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) {
-  return (
-    <span className={cn(
-      "mx-1 inline-block rounded-lg px-2.5 py-0.5 text-emerald-950",
-      dark ? "bg-amber-400" : "bg-amber-300"
-    )}>
-      {children}
-    </span>
-  );
-}
-
-function SectionTitle({ kicker, title, sub, light = false, highlight }: {
-  kicker?: string; title: React.ReactNode; sub?: string; light?: boolean; highlight?: React.ReactNode;
-}) {
-  return (
-    <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
-      {kicker && (
-        <p className={cn("mb-2 text-xs font-extrabold tracking-widest sm:text-sm", light ? "text-amber-300" : "text-amber-600")}>
-          {kicker}
-        </p>
-      )}
-      <h2 className={cn("font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug", light ? "text-white" : "text-emerald-950")}>
-        {title} {highlight && <HL dark={light}>{highlight}</HL>}
-      </h2>
-      {sub && <p className={cn("mt-3 text-[clamp(0.875rem,2vw,1rem)] leading-7", light ? "text-emerald-100/70" : "text-emerald-900/60")}>{sub}</p>}
-    </div>
-  );
-}
-
-const LEVELS = [
-  { n: "١", icon: "📖" },
-  { n: "٢", icon: "🌙" },
-  { n: "٣", icon: "📜" },
-];
-
-const FEATURES = [
-  { icon: "🔴" }, { icon: "🎧" }, { icon: "🛡️" }, { icon: "📝" }, { icon: "📲" }, { icon: "🏆" },
-];
-
-/** Public landing page — sanad-inspired structure, Quran-platform identity. */
+/** Public landing page — sanad-inspired structure, fully CMS-managed. */
 export default async function LandingPage() {
-  const { locale, profile, courses, testimonials, totalStudents, viewerCountry } = await loadLanding();
-  const d = await t();
+  const [{ locale, profile, courses, testimonials, totalStudents, viewerCountry }, site] = await Promise.all([
+    loadLanding(),
+    getSiteData(),
+  ]);
+  const base = await t();
+  const d = mergeDicts(base, site.texts[locale]);
+  const S = site.sections; // section visibility
+
   if (!profile && courses.length === 0) return <LandingFallback />;
   const ar = locale === "ar";
-  const achievements = (profile?.achievements ?? "").split("\n").filter(Boolean);
   const wa = profile?.whatsappNumber?.replace(/\D/g, "");
 
   const waMessage = ar
     ? "مرحبًا، أرغب بالاستفسار عن دورات تعليم القرآن وإتقانه 🌙"
     : "Hello, I would like to ask about the Quran recitation and Ijazah courses 🌙";
   const waHref = wa ? waLink(wa, waMessage) : null;
+
+  const achievements = (profile?.achievements ?? "").split("\n").filter(Boolean);
+  const heroLines: string[] = Array.isArray(d.heroLines) ? d.heroLines : [];
+  const statsValues: number[] = Array.isArray(d.statsValues) ? d.statsValues.map(Number) : [];
+  const levelNames = d.levelNames;
+  const levelTags = d.levelTags;
+  const steps = d.steps;
+  const featTitles = d.featTitles;
+  const featDescs = d.featDescs;
+  const badges = d.badges;
+  // first stat = live enrollment count unless the admin set a fixed override
+  const stat0 = Number.isFinite(statsValues[0]) && statsValues[0] > 0 ? statsValues[0] : totalStudents;
+  const stats: Array<[number, string]> = [
+    [stat0, d.statsLabels[0] ?? ""],
+    [statsValues[1] ?? 3, d.statsLabels[1] ?? ""],
+    [statsValues[2] ?? 10, d.statsLabels[2] ?? ""],
+    [statsValues[3] ?? 15, d.statsLabels[3] ?? ""],
+  ];
 
   return (
     <main className="min-h-dvh bg-[#faf8f2]">
@@ -148,7 +134,8 @@ export default async function LandingPage() {
           <Link href="/" className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.svg" alt="" className="h-9 w-9 sm:h-10 sm:w-10" />
-            <span className="font-display text-sm font-extrabold sm:text-base">{profile?.displayName}</span>
+            <span className="font-display text-base font-extrabold sm:text-lg">{d.siteName}</span>
+            <span className="hidden text-xs font-bold text-emerald-700/70 sm:block">· {profile?.displayName}</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <LangSwitcher current={locale} />
@@ -162,80 +149,100 @@ export default async function LandingPage() {
         </div>
       </nav>
 
-      {/* ─── Hero (light, sanad-style: copy right, visual left) ─── */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-white to-[#f2efe6]">
-        <div className="pattern-khatam-light pointer-events-none absolute inset-0 opacity-70" />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-2 lg:gap-14 lg:py-20">
-          {/* Copy */}
-          <div className="order-2 text-center lg:order-1 lg:text-right">
-            <h1 className="font-display text-[clamp(1.8rem,5.5vw,3rem)] font-extrabold leading-[1.5] text-emerald-950">
-              {ar ? "منصّة لأتقان" : "A platform to master"}
-              <br />
-              {ar ? <>تلاوة <HL>القرآنِ الكريم</HL> وتتلمذي</> : <>your <HL>Quran</HL> recitation</>}
-              <br />
-              {ar ? <>في أي <HL>مكانٍ</HL> وأي <HL>وقتٍ</HL></> : <>anywhere, <HL>anytime</HL></>}
-              <br />
-              <span className="text-emerald-700">
-                {ar ? <>…حتى <HL>الإجازة</HL></> : <>…all the way to <HL>Ijazah</HL></>}
-              </span>
-            </h1>
-            <p className="mx-auto mt-5 max-w-xl text-sm leading-8 text-emerald-900/70 sm:leading-8 lg:mx-0">
-              {profile?.title}
-            </p>
-            <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
-              <Link href="/register" className={cn(buttonVariants({ size: "lg" }), "bg-emerald-800 text-white shadow-lg shadow-emerald-800/25 hover:bg-emerald-700")}>
-                {d.startNow}
-              </Link>
-              <a href="#levels" className={cn(buttonVariants({ size: "lg" }), "border-2 border-emerald-800/25 bg-white text-emerald-900 hover:bg-emerald-50")}>
-                {d.levelsBtn}
-              </a>
-              {waHref && (
-                <a href={waHref} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ size: "lg" }), "bg-[#25D366] text-white shadow-lg hover:bg-[#1ebe57]")}>
-                  💬 {d.contactAdmin}
+      {/* ─── Hero (full-bleed, trateel-style) ─── */}
+      {S.hero && (
+      <section className="relative overflow-hidden bg-gradient-to-bl from-emerald-950 via-emerald-900 to-emerald-950 text-white">
+        <div className="pattern-khatam pointer-events-none absolute inset-0 opacity-40" />
+        <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-[36rem] -translate-x-1/2 rounded-full bg-emerald-500/20 blur-3xl" />
+        <div className="relative mx-auto max-w-6xl px-4 pb-28 pt-14 sm:px-6 sm:pb-40 sm:pt-20">
+          <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
+            <div className="order-2 text-center lg:order-1 lg:text-right">
+              <p className="mb-3 font-display text-lg font-bold text-amber-300/90 sm:text-xl">{d.siteName}</p>
+              <h1 className="font-display text-[clamp(1.9rem,5.5vw,3.2rem)] font-extrabold leading-[1.55] text-white">
+                {heroLines.map((line, i) => (
+                  <span key={i} className={cn(i > 0 && "block")}>
+                    <Rich text={line} dark />
+                  </span>
+                ))}
+              </h1>
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-8 text-emerald-100/80 lg:mx-0">{profile?.title}</p>
+              <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
+                <Link href="/register" className={cn(buttonVariants({ size: "lg" }), "bg-white text-emerald-950 shadow-xl hover:bg-amber-50")}>
+                  {d.startNow}
+                </Link>
+                <a href="#levels" className={cn(buttonVariants({ size: "lg" }), "border border-white/25 bg-white/10 text-white hover:bg-white/15")}>
+                  {d.levelsBtn}
                 </a>
-              )}
+                {waHref && (
+                  <a href={waHref} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ size: "lg" }), "bg-[#25D366] text-white shadow-lg hover:bg-[#1ebe57]")}>
+                    💬 {d.contactAdmin}
+                  </a>
+                )}
+              </div>
+              <div className="mt-7 flex flex-wrap justify-center gap-2 lg:justify-start">
+                {badges.map((b) => (
+                  <span key={b} className="rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-[11px] font-bold text-emerald-100/85 sm:text-xs">
+                    ✓ {b}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="mt-7 flex flex-wrap justify-center gap-2 lg:justify-start">
-              {d.badges.map((b) => (
-                <span key={b} className="rounded-full bg-emerald-900/[0.06] px-3.5 py-1.5 text-[11px] font-bold text-emerald-900/80 ring-1 ring-emerald-900/10 sm:text-xs">
-                  ✓ {b}
-                </span>
-              ))}
-            </div>
-          </div>
 
-          {/* Mushaf artwork */}
-          <div className="relative order-1 mx-auto w-full max-w-xs sm:max-w-sm lg:order-2 lg:max-w-md">
-            <div className="absolute inset-0 -z-10 translate-y-8 rounded-[3rem] bg-emerald-700/10 blur-3xl" />
-            <div className="relative rounded-[2rem] border border-emerald-900/10 bg-emerald-950 p-3 shadow-2xl shadow-emerald-900/30 sm:p-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/mushaf.svg" alt="مصحف مفتوح" className="w-full" />
-              <div className="absolute -bottom-5 left-1/2 w-max -translate-x-1/2 rounded-2xl border border-amber-300/30 bg-emerald-950 px-5 py-2.5 text-center shadow-xl">
-                <p className="text-[11px] font-extrabold text-amber-200 sm:text-xs">{d.frameTitle}</p>
-                <p className="text-[10px] text-emerald-100/60">{d.frameSub}</p>
+            {/* Mushaf artwork */}
+            <div className="relative order-1 mx-auto hidden w-full max-w-sm lg:order-2 lg:block xl:max-w-md">
+              <div className="absolute inset-0 -z-10 translate-y-6 rounded-[3rem] bg-emerald-500/15 blur-3xl" />
+              <div className="relative rounded-[2rem] border border-white/10 bg-white/[0.06] p-3 shadow-2xl backdrop-blur-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/mushaf.svg" alt="مصحف مفتوح" className="w-full" />
+                <div className="absolute -bottom-5 left-1/2 w-max -translate-x-1/2 rounded-2xl border border-amber-300/30 bg-emerald-950 px-5 py-2.5 text-center shadow-xl">
+                  <p className="text-[11px] font-extrabold text-amber-200 sm:text-xs">{d.frameTitle}</p>
+                  <p className="text-[10px] text-emerald-100/60">{d.frameSub}</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
+      )}
 
-      {/* ─── Three levels: program cards (sanad-style) ─── */}
+      {/* ─── Navy intro card overlapping the hero (trateel-style) ─── */}
+      {S.hero && (
+      <div className="relative z-10 mx-auto -mt-16 max-w-4xl px-4 sm:-mt-24 sm:px-6">
+        <div className="relative overflow-hidden rounded-[2rem] bg-[#182a52] p-6 text-white shadow-2xl sm:p-10">
+          <div className="pattern-khatam pointer-events-none absolute inset-0 opacity-25" />
+          <div className="relative">
+            <div className="flex items-center justify-center gap-3">
+              <span className="rounded-full bg-amber-400 px-4 py-1 text-xs font-extrabold text-emerald-950">{d.aboutPill}</span>
+            </div>
+            <h2 className="mt-4 text-center font-display text-xl font-extrabold sm:text-2xl">{d.aboutCardTitle}</h2>
+            <p className="mt-4 text-center text-sm leading-8 text-white/80 sm:leading-8">{profile?.bio}</p>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* ─── Three levels: program cards ─── */}
+      {S.levels && (
       <section id="levels" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-        <SectionTitle kicker={d.levelsKicker} title={d.levelsTitle} sub={d.levelsSub} />
+        <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
+          <p className="mb-2 text-xs font-extrabold tracking-widest text-amber-600 sm:text-sm">{d.levelsKicker}</p>
+          <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug text-emerald-950">
+            <Rich text={d.levelsTitle} /> <Rich text={d.levelsTitleHl} />
+          </h2>
+          {d.levelsSub && <p className="mt-3 text-[clamp(0.875rem,2vw,1rem)] leading-7 text-emerald-900/60">{d.levelsSub}</p>}
+        </div>
 
         <div className="grid gap-5 md:grid-cols-3">
-          {d.levelNames.map((name, i) => (
+          {levelNames.map((name, i) => (
             <div key={name} className="group relative flex flex-col overflow-hidden rounded-3xl border border-emerald-900/10 bg-white shadow-sm transition hover:-translate-y-1.5 hover:shadow-xl">
-              {/* program logo header */}
               <div className="relative bg-gradient-to-b from-emerald-950 to-emerald-900 px-6 pb-8 pt-7 text-center text-white">
                 <div className="pattern-khatam pointer-events-none absolute inset-0 opacity-40" />
                 <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-300 font-display text-3xl font-extrabold text-emerald-950 shadow-lg">
-                  {LEVELS[i].icon}
+                  {LEVEL_ICONS[i]}
                 </div>
                 <h3 className="relative mt-3 font-display text-lg font-extrabold">{name}</h3>
-                <p className="relative mt-1 text-xs font-bold text-amber-200/90">{d.levelTags[i]}</p>
+                <p className="relative mt-1 text-xs font-bold text-amber-200/90">{levelTags[i]}</p>
               </div>
-              {/* feature list */}
               <ul className="flex-1 space-y-2.5 px-6 py-5 text-sm text-emerald-900/75">
                 {(ar
                   ? ["تسميع مباشر ومعتمد", "متابعة فردية دورية", "تقييم قبل الانتقال"]
@@ -256,27 +263,38 @@ export default async function LandingPage() {
           ))}
         </div>
       </section>
+      )}
 
-      {/* ─── Navy band CTA (sanad-style) ─── */}
-      <section className="relative overflow-hidden bg-emerald-950 py-12 text-center text-white sm:py-16">
-        <div className="pattern-khatam pointer-events-none absolute inset-0 opacity-40" />
-        <div className="relative mx-auto max-w-2xl px-4">
-          <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold">
-            {ar ? <>مسار <HL dark>إتقان</HL> متكامل</> : <>A complete <HL dark>mastery</HL> path</>}
-          </h2>
-          <p className="mt-3 text-sm text-emerald-100/75 sm:text-base">
-            {ar ? "برنامج متكامل لتعليم التلاوة المتقنة وإتقان القراءات المهنّد من الإجازة" : "A complete program for precise recitation and certified qira'at, ending in Ijazah"}
-          </p>
-          <Link href="/register" className={cn(buttonVariants({ size: "lg" }), "mt-6 border-2 border-amber-300/40 bg-white/5 text-amber-100 hover:bg-white/10")}>
-            {d.ctaRegister}
-          </Link>
+      {/* ─── Navy band CTA ─── */}
+      {S.band && (
+      <section className="bg-[#faf8f2] py-2">
+        <div className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-l from-emerald-950 to-emerald-900 py-12 text-center text-white sm:py-16">
+            <div className="pattern-khatam pointer-events-none absolute inset-0 opacity-40" />
+            <div className="relative mx-auto max-w-2xl px-4">
+              <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold">
+                <Rich text={d.bandTitle} dark />
+              </h2>
+              <p className="mt-3 text-sm text-emerald-100/75 sm:text-base">{d.bandSub}</p>
+              <Link href="/register" className={cn(buttonVariants({ size: "lg" }), "mt-6 bg-white text-emerald-950 shadow-xl hover:bg-amber-50")}>
+                {d.ctaRegister}
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
+      )}
 
-      {/* ─── Meet the teacher (circular photo, sanad instructors style) ─── */}
+      {/* ─── Meet the teacher ─── */}
+      {S.teacher && (
       <section className="bg-white py-16 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <SectionTitle kicker={d.aboutKicker} title={d.aboutTitle} highlight={d.meetTeacher} />
+          <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
+            <p className="mb-2 text-xs font-extrabold tracking-widest text-amber-600 sm:text-sm">{d.aboutKicker}</p>
+            <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug text-emerald-950">
+              <Rich text={d.aboutTitle} /> <Rich text={d.meetTeacherHl} />
+            </h2>
+          </div>
           <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-start sm:gap-10 sm:text-right">
             <div className="relative shrink-0">
               <div className="absolute -inset-2 rounded-full border-2 border-dashed border-amber-300/70" aria-hidden />
@@ -304,58 +322,81 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ─── Stats counters ─── */}
+      {S.stats && (
       <section className="pattern-khatam-light bg-[#f2efe6] py-16 sm:py-20">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <SectionTitle kicker={d.statsKicker} title={d.statsTitle} />
+          <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
+            <p className="mb-2 text-xs font-extrabold tracking-widest text-amber-600 sm:text-sm">{d.statsKicker}</p>
+            <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug text-emerald-950"><Rich text={d.statsTitle} /></h2>
+          </div>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard value={<CountUp to={totalStudents} arabicIndic={ar} />} label={d.statsLabels[0]} />
-            <StatCard value={<CountUp to={3} arabicIndic={ar} />} label={d.statsLabels[1]} />
-            <StatCard value={<CountUp to={10} arabicIndic={ar} />} label={d.statsLabels[2]} />
-            <StatCard value={<CountUp to={15} suffix="+" arabicIndic={ar} />} label={d.statsLabels[3]} />
+            {stats.map(([value, label], i) => (
+              <StatCard key={i} value={<CountUp to={value} arabicIndic={ar} suffix={i === 3 ? "+" : ""} />} label={label} />
+            ))}
           </div>
         </div>
       </section>
+      )}
 
-      {/* ─── How to start (3 steps) ─── */}
+      {/* ─── How the platform works (circular icons, trateel-style) ─── */}
+      {S.steps && (
       <section className="bg-white py-16 sm:py-20">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <SectionTitle kicker={d.stepsKicker} title={d.stepsTitle} />
-          <div className="grid gap-5 sm:grid-cols-3">
-            {d.steps.map((s, i) => (
-              <div key={s.t} className="relative rounded-3xl border border-emerald-900/10 bg-[#faf8f2] p-6 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-950 font-display text-xl font-extrabold text-amber-300 shadow-lg">
-                  {ar ? ["١", "٢", "٣"][i] : i + 1}
+          <div className="mx-auto mb-12 max-w-2xl text-center">
+            <p className="mb-2 text-xs font-extrabold tracking-widest text-amber-600 sm:text-sm">{d.howKicker}</p>
+            <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug text-emerald-950"><Rich text={d.howTitle} /></h2>
+            {d.stepsSub && <p className="mt-3 text-sm leading-7 text-emerald-900/60">{d.stepsSub}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-4">
+            {(steps.length === 3 ? [...steps, { t: ar ? "ابدئي التلاوة" : "Start reciting", d: ar ? "من درسك التجريبي المجاني حتى الإجازة" : "From your free trial lesson to Ijazah" }] : steps).slice(0, 4).map((s, i) => (
+              <div key={s.t} className="text-center">
+                <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-b from-emerald-800 to-emerald-950 shadow-lg shadow-emerald-900/20">
+                  <span className="font-display text-2xl font-extrabold text-amber-300">{ar ? ["١", "٢", "٣", "٤"][i] : i + 1}</span>
                 </div>
-                <h3 className="mt-4 font-display text-base font-extrabold text-emerald-950 sm:text-lg">{s.t}</h3>
-                <p className="mt-2 text-sm leading-7 text-emerald-900/65">{s.d}</p>
+                <h3 className="mt-4 font-display text-sm font-extrabold text-emerald-950 sm:text-base">{s.t}</h3>
+                <p className="mx-auto mt-1.5 max-w-[14rem] text-xs leading-6 text-emerald-900/60">{s.d}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
+      )}
 
-      {/* ─── Features (dark) ─── */}
-      <section className="relative overflow-hidden bg-emerald-950 py-16 text-white sm:py-20">
-        <div className="pattern-khatam pointer-events-none absolute inset-0 opacity-40" />
-        <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
-          <SectionTitle light kicker={d.featKicker} title={d.featTitle} />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f, i) => (
-              <div key={d.featTitles[i]} className="group rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur-sm transition hover:-translate-y-1 hover:border-amber-300/30 hover:bg-white/10">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-2xl transition group-hover:bg-amber-300/15">{f.icon}</span>
-                <h3 className="mt-4 font-display text-base font-extrabold text-amber-200 sm:text-lg">{d.featTitles[i]}</h3>
-                <p className="mt-2 text-sm leading-7 text-emerald-100/70">{d.featDescs[i]}</p>
+      {/* ─── Why section (navy rounded card with checkmarks, trateel-style) ─── */}
+      {S.features && (
+      <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-20">
+        <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-bl from-emerald-950 via-emerald-900 to-[#182a52] p-6 text-white sm:p-12">
+          <div className="pattern-khatam pointer-events-none absolute inset-0 opacity-30" />
+          <div className="relative mx-auto mb-10 max-w-2xl text-center">
+            <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug"><Rich text={d.featTitle} dark /></h2>
+            {d.featSub && <p className="mt-3 text-sm leading-7 text-emerald-100/70">{d.featSub}</p>}
+          </div>
+          <div className="relative grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+            {featTitles.map((title, i) => (
+              <div key={title} className="flex items-start gap-2.5">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[10px] font-extrabold text-emerald-950">✓</span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-amber-200 sm:text-[15px]">{title}</h3>
+                  <p className="mt-1 text-xs leading-6 text-emerald-100/65">{featDescs[i]}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+      )}
 
       {/* ─── Courses ─── */}
+      {S.courses && (
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-        <SectionTitle kicker={d.coursesKicker} title={d.coursesTitle} sub={d.coursesSub} />
+        <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
+          <p className="mb-2 text-xs font-extrabold tracking-widest text-amber-600 sm:text-sm">{d.coursesKicker}</p>
+          <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug text-emerald-950"><Rich text={d.coursesTitle} /></h2>
+          {d.coursesSub && <p className="mt-3 text-[clamp(0.875rem,2vw,1rem)] leading-7 text-emerald-900/60">{d.coursesSub}</p>}
+        </div>
         {courses.length === 0 ? (
           <p className="rounded-3xl bg-white p-10 text-center text-sm text-emerald-900/60 shadow-sm">{d.noCourses}</p>
         ) : (
@@ -392,12 +433,16 @@ export default async function LandingPage() {
           </div>
         )}
       </section>
+      )}
 
       {/* ─── Methodology ─── */}
-      {profile?.methodology && (
+      {S.methodology && profile?.methodology && (
         <section className="pattern-khatam-light bg-[#f2efe6] py-16 sm:py-20">
           <div className="mx-auto max-w-4xl px-4 sm:px-6">
-            <SectionTitle kicker={d.methodKicker} title={d.methodTitle} />
+            <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
+              <p className="mb-2 text-xs font-extrabold tracking-widest text-amber-600 sm:text-sm">{d.methodKicker}</p>
+              <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug text-emerald-950"><Rich text={d.methodTitle} /></h2>
+            </div>
             <div className="relative rounded-3xl border border-amber-200/60 bg-white p-6 text-sm leading-8 text-emerald-950/85 shadow-sm sm:p-10 sm:leading-9">
               <span className="absolute -top-4 right-8 rounded-full bg-amber-400 px-3 py-1 text-xs font-extrabold text-emerald-950 shadow">{d.methodBadge}</span>
               <p className="whitespace-pre-line">{profile.methodology}</p>
@@ -407,10 +452,13 @@ export default async function LandingPage() {
       )}
 
       {/* ─── Testimonials ─── */}
-      {testimonials.length > 0 && (
+      {S.testimonials && testimonials.length > 0 && (
         <section className="bg-white py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <SectionTitle kicker={d.testiKicker} title={d.testiTitle} />
+            <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
+              <p className="mb-2 text-xs font-extrabold tracking-widest text-amber-600 sm:text-sm">{d.testiKicker}</p>
+              <h2 className="font-display text-[clamp(1.5rem,4.5vw,2.4rem)] font-extrabold leading-snug text-emerald-950"><Rich text={d.testiTitle} /></h2>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {testimonials.map((x) => (
                 <figure key={x.id} className="relative flex flex-col rounded-3xl border border-emerald-900/10 bg-[#faf8f2] p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
@@ -431,6 +479,7 @@ export default async function LandingPage() {
       )}
 
       {/* ─── Final CTA ─── */}
+      {S.finalCta && (
       <section className="relative overflow-hidden bg-gradient-to-l from-emerald-950 to-emerald-900 py-16 text-center text-white sm:py-20">
         <div className="pattern-khatam pointer-events-none absolute inset-0 opacity-50" />
         <div className="relative mx-auto max-w-2xl px-4 sm:px-6">
@@ -447,17 +496,18 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ─── Footer ─── */}
       <footer className="border-t border-emerald-900/10 bg-emerald-950 pb-10 pt-10 text-center text-xs text-emerald-100/50 sm:pb-12">
         <p className="font-display text-lg text-amber-200/90">﷽</p>
-        <p className="mt-3 text-sm font-extrabold text-emerald-100/80">{profile?.displayName} — {d.footerBrand}</p>
+        <p className="mt-3 text-sm font-extrabold text-emerald-100/80">{d.siteName} — منصة {profile?.displayName}</p>
         <p className="mt-1.5">{profile?.title}</p>
         <p className="mt-4">{d.footerNote}</p>
       </footer>
 
       {/* ─── Floating WhatsApp ─── */}
-      {waHref && (
+      {S.whatsappFloat && waHref && (
         <a
           href={waHref}
           target="_blank"

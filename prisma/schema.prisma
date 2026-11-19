@@ -14,6 +14,7 @@ enum Role {
   ADMIN // platform owner
   TEACHER // the single Quran teacher
   STUDENT
+  ASSISTANT // teaching assistant: follows student chats when the teacher is unavailable
 }
 
 enum ViolationType {
@@ -42,8 +43,50 @@ model User {
   audioSubmissions   AudioSubmission[]
   violations         SecurityViolation[]
   attendanceLogs     AttendanceLog[]
+  conversations      Conversation[]
 
   @@index([role])
+}
+
+// ---------- Site content (landing page CMS) ----------
+
+// Singleton row (id = "landing") holding section visibility + editable texts for AR/EN.
+model SiteContent {
+  id        String   @id @default("landing")
+  data      Json     // { sections: {key: bool}, texts: { ar: {key: string|list}, en: {...} } }
+  updatedAt DateTime @updatedAt
+}
+
+// ---------- Student ↔ staff chat ----------
+
+model Conversation {
+  id            String   @id @default(cuid())
+  studentId     String
+  subject       String   @default("") // e.g. course title or general inquiry
+  lastMessageAt DateTime @default(now())
+  staffUnread   Int      @default(0) // messages from student not yet read by staff
+  studentUnread Int      @default(0) // messages from staff not yet read by student
+  assignedToId  String?  // staff member currently handling this conversation
+  createdAt     DateTime @default(now())
+
+  student  User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([studentId])
+  @@index([lastMessageAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  senderRole     Role
+  body           String   @db.Text
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }
 
 model Session {

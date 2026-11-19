@@ -106,8 +106,17 @@ export async function requireAdmin(): Promise<SessionUser> {
   return user;
 }
 
-/** Teacher areas: the TEACHER or the platform ADMIN (oversight). */
+/** Teacher areas: the TEACHER or the platform ADMIN (oversight). ASSISTANT cannot enter. */
 export async function requireTeacher(): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.role !== "TEACHER" && user.role !== "ADMIN") redirect("/dashboard");
+  return user;
+}
+
+/** Staff shell: TEACHER + ADMIN + ASSISTANT (teaching assistant). The assistant
+ * only gets the chat inbox (layout nav filters by role). */
+export async function requireStaff(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.role === "STUDENT") redirect("/dashboard");
@@ -122,14 +131,17 @@ export async function requireStudent(): Promise<SessionUser> {
 }
 
 /** API-route guard returning a Response instead of redirecting.
- * need: "any" | "ADMIN" (platform owner only) | "TEACHER" (TEACHER or ADMIN) | "STUDENT". */
-export async function apiUser(need: "any" | "ADMIN" | "TEACHER" | "STUDENT" = "any") {
+ * need: "any" | "ADMIN" (platform owner only) | "TEACHER" (TEACHER or ADMIN)
+ * | "STAFF" (TEACHER, ADMIN or ASSISTANT) | "STUDENT". */
+export async function apiUser(need: "any" | "ADMIN" | "TEACHER" | "STAFF" | "STUDENT" = "any") {
   const user = await getCurrentUser();
   if (!user) return { user: null, error: Response.json({ error: "غير مصرح" }, { status: 401 }) };
   if (need === "ADMIN" && user.role !== "ADMIN")
     return { user: null, error: Response.json({ error: "لمدير المنصة فقط" }, { status: 403 }) };
-  if (need === "TEACHER" && user.role === "STUDENT")
+  if (need === "TEACHER" && user.role !== "TEACHER" && user.role !== "ADMIN")
     return { user: null, error: Response.json({ error: "للمعلمة فقط" }, { status: 403 }) };
+  if (need === "STAFF" && user.role === "STUDENT")
+    return { user: null, error: Response.json({ error: "لفريق العمل فقط" }, { status: 403 }) };
   if (need === "STUDENT" && user.role !== "STUDENT")
     return { user: null, error: Response.json({ error: "للطالبات فقط" }, { status: 403 }) };
   return { user, error: null };
