@@ -131,11 +131,9 @@ export default async function LandingPage() {
       {/* ─── Navbar ─── */}
       <nav className="sticky top-0 z-40 border-b border-emerald-900/10 bg-white/95 text-emerald-950 shadow-sm backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2.5 sm:px-6 sm:py-3">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2 pr-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.svg" alt="" className="h-9 w-9 sm:h-10 sm:w-10" />
-            <span className="font-display text-base font-extrabold sm:text-lg">{d.siteName}</span>
-            <span className="hidden text-xs font-bold text-emerald-700/70 sm:block">· {profile?.displayName}</span>
+            <img src="/logo.png" alt="مُقْرِئَة" className="h-12 w-auto sm:h-14" />
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <LangSwitcher current={locale} />

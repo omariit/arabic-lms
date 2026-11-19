@@ -43,8 +43,10 @@ export default function RegisterPage() {
       <div className="mb-4 flex justify-center">
         <LangSwitcher current={(typeof document !== "undefined" && (document.cookie.match(/lang=(en|ar)/)?.[1] as "en" | "ar")) || "ar"} />
       </div>
-      <Card>
-        <CardContent className="p-6">
+      <Card className="w-full min-w-0">
+        <CardContent className="w-full min-w-0 p-6">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="مُقْرِئَة" className="mx-auto mb-4 h-20 w-auto" />
           <h1 className="mb-1 text-center text-2xl font-extrabold">حساب جديد</h1>
           <p className="mb-6 text-center text-sm text-gray-500">اسمك ورقم هاتفك سيظهران كعلامة مائية على الفيديو</p>
           <form onSubmit={submit} className="space-y-4">
@@ -56,7 +58,7 @@ export default function RegisterPage() {
               <Label htmlFor="country">الدولة</Label>
               <Select id="country" value={country} onChange={(e) => setCountry(e.target.value)}>
                 {COUNTRIES.map((c) => (
-                  <option key={c.code} value={c.code}>{c.nameAr} (+{c.dial})</option>
+                  <option key={c.code} value={c.code}>+{c.dial} {c.nameAr}</option>
                 ))}
               </Select>
             </div>

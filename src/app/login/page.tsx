@@ -41,21 +41,23 @@ export default function LoginPage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4">
       <div className="mb-4 flex justify-center"><LangSwitcherWithFallback /></div>
-      <Card>
-        <CardContent className="p-6">
+      <Card className="w-full min-w-0">
+        <CardContent className="w-full min-w-0 p-6">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="مُقْرِئَة" className="mx-auto mb-4 h-20 w-auto" />
           <h1 className="mb-1 text-center text-2xl font-extrabold">تسجيل الدخول</h1>
           <p className="mb-6 text-center text-sm text-gray-500">بالهاتف وكلمة المرور — جلسة على جهاز واحد فقط</p>
           <form onSubmit={submit} className="space-y-4">
-            <div className="grid grid-cols-[1fr_2fr] gap-2">
-              <div>
+            <div className="grid min-w-0 grid-cols-[1fr_2fr] gap-2">
+              <div className="min-w-0">
                 <Label htmlFor="country">المفتاح</Label>
-                <Select id="country" value={country} onChange={(e) => setCountry(e.target.value)}>
+                <Select id="country" className="px-2 text-sm" value={country} onChange={(e) => setCountry(e.target.value)}>
                   {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.code}>{c.nameAr} (+{c.dial})</option>
+                    <option key={c.code} value={c.code}>+{c.dial} {c.nameAr}</option>
                   ))}
                 </Select>
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="phone">رقم الهاتف</Label>
                 <Input id="phone" dir="ltr" inputMode="tel" placeholder="0787262186" value={phone} onChange={(e) => setPhone(e.target.value)} required />
               </div>
