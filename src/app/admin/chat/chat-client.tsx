@@ -1,14 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { VoiceNoteRecorder, VoiceNotePlayer } from "@/components/voice-note";
 
 type Conv = {
-  id: string; studentName: string; studentPhone: string; subject: string;
+  id: string; studentId: string; studentName: string; studentPhone: string; subject: string;
   lastMessageAt: string; unread: number; assignedToId: string | null;
   preview: string; previewRole: string | null;
 };
 type Staff = { id: string; fullName: string; role: string };
-type Msg = { id: string; senderId: string; senderRole: string; body: string; createdAt: string };
+type Msg = { id: string; senderId: string; senderRole: string; body: string; audioKey?: string | null; createdAt: string };
 
 const ROLE_LABEL: Record<string, string> = {
   TEACHER: "المعلمة", ADMIN: "الإدارة", ASSISTANT: "مساعدة", STUDENT: "الطالبة",
@@ -19,6 +20,7 @@ export function StaffChat({ meId }: { meId: string }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
+  const [voice, setVoice] = useState<{ key: string; mime: string } | null>(null);
   const [showList, setShowList] = useState(true);
   const bottom = useRef<HTMLDivElement>(null);
 
@@ -56,12 +58,14 @@ export function StaffChat({ meId }: { meId: string }) {
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || !activeId) return;
+    if ((!text && !voice) || !activeId) return;
+    const payload = { body: text, audioKey: voice?.key, audioMime: voice?.mime };
     setDraft("");
+    setVoice(null);
     await fetch(`/api/admin/chat/${activeId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: text }),
+      body: JSON.stringify(payload),
     });
     await Promise.all([loadThread(activeId), loadInbox()]);
   };
@@ -141,7 +145,8 @@ export function StaffChat({ meId }: { meId: string }) {
                 <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-6 shadow-sm ${mine ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-950"}`}>
                     {!mine && <p className="mb-0.5 text-[10px] font-extrabold text-brand-700">{ROLE_LABEL[m.senderRole] ?? ""}</p>}
-                    {m.body}
+                    {m.body && <p className="whitespace-pre-line">{m.body}</p>}
+                    {m.audioKey && <VoiceNotePlayer messageId={m.id} endpoint="/api/chat/audio/{id}" mine={mine} />}
                   </div>
                 </div>
               );
@@ -149,15 +154,19 @@ export function StaffChat({ meId }: { meId: string }) {
             <div ref={bottom} />
           </div>
 
-          <div className="flex gap-2 border-t border-brand-100 p-3">
-            <input
-              className="flex-1 rounded-xl border border-brand-100 bg-brand-50/50 px-3 py-2.5 text-sm outline-none focus:border-brand-400"
-              placeholder="اكتبي ردك…"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-            />
-            <button onClick={send} className="rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-extrabold text-white">إرسال</button>
+          <div className="border-t border-brand-100 p-3">
+            {voice && <p className="mb-2 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-800">🎙 تسجيل جاهز — اضغطي إرسال</p>}
+            <div className="flex items-center gap-2">
+              <input
+                className="min-w-0 flex-1 rounded-xl border border-brand-100 bg-brand-50/50 px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                placeholder="اكتبي ردك… أو سجّلي صوتك"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+              />
+              <VoiceNoteRecorder kind="feedback" forUser={active?.studentId} onReady={setVoice} />
+              <button onClick={send} className="rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-extrabold text-white">إرسال</button>
+            </div>
           </div>
         </div>
       )}

@@ -5,12 +5,13 @@ import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Badge, Textarea } from "@/components/ui/primitives";
 import { LessonAudioUploader } from "@/components/lesson-audio";
+import { CoverUploader, LessonResources } from "@/components/course-extras";
 import { COUNTRIES, countryName } from "@/lib/phone";
 
 type Module = { id: string; title: string; position: number; lessons: Lesson[] };
 type Lesson = { id: string; title: string; youtubeId: string; access: string; position: number; description?: string; scriptText?: string; assignmentTitle?: string | null; assignmentInstructions?: string; audioKey?: string | null };
 type CoursePrice = { id?: string; countryCode: string; price: number };
-type CourseInfo = { price: number; weeklyMeetings: string; prices: CoursePrice[]; modules: Module[] };
+type CourseInfo = { price: number; weeklyMeetings: string; prices: CoursePrice[]; modules: Module[]; coverImageKey?: string | null; outcomes?: string; requirements?: string; published?: boolean; title?: string };
 
 const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 
@@ -56,6 +57,11 @@ export function CourseBuilder() {
   const [prices, setPrices] = useState<CoursePrice[]>([]);
   const [newCC, setNewCC] = useState("US");
   const [newPrice, setNewPrice] = useState("");
+  const [outcomes, setOutcomes] = useState("");
+  const [requirements, setRequirements] = useState("");
+  const [published, setPublished] = useState(false);
+  const [hasCover, setHasCover] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
   const [priceSaved, setPriceSaved] = useState(false);
   const [lessonForms, setLessonForms] = useState<Record<string, { title: string; youtubeId: string; access: string }>>({});
   const [editing, setEditing] = useState<Record<string, { title: string; youtubeId: string; access: string; description: string; scriptText: string; assignmentTitle: string; assignmentInstructions: string }>>({});
@@ -70,6 +76,10 @@ export function CourseBuilder() {
       setWeeklyMeetings(course?.weeklyMeetings ?? "");
       setBasePrice(Number(course?.price ?? 0));
       setPrices(course?.prices ?? []);
+      setOutcomes(course?.outcomes ?? "");
+      setRequirements(course?.requirements ?? "");
+      setPublished(Boolean(course?.published));
+      setHasCover(Boolean(course?.coverImageKey));
       setLoaded(true);
     } finally { setBusy(false); }
   };
@@ -233,6 +243,57 @@ export function CourseBuilder() {
       </Card>
 
       <Card>
+        <CardContent className="space-y-3 pt-5">
+          <CoverUploader courseId={courseId} hasCover={hasCover} onChange={() => load()} />
+          <div>
+            <Label>🎯 ماذا ستتعلّم الطالبة؟ (سطر لكل نقطة)</Label>
+            <Textarea
+              rows={4}
+              placeholder={"قراءة صحيحة متقنة · أحكام التجويد الأساسية · ضبط المخارج والصفات"}
+              value={outcomes}
+              onChange={(e) => setOutcomes(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>📋 المتطلبات السابقة (سطر لكل متطلب)</Label>
+            <Textarea
+              rows={2}
+              placeholder={"إلمام بقراءة القرآن · جهاز بميكروفون للواجبات الصوتية"}
+              value={requirements}
+              onChange={(e) => setRequirements(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={() => run(async () => {
+                await fetch(`/api/admin/courses/${courseId}`, {
+                  method: "PUT", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ outcomes, requirements }),
+                });
+                setSaveMsg("تم حفظ تفاصيل الدورة ✓");
+                setTimeout(() => setSaveMsg(""), 2500);
+              })}
+              disabled={busy}
+            >حفظ تفاصيل الدورة</Button>
+            <Button
+              variant={published ? "secondary" : "success"}
+              onClick={() => run(async () => {
+                await fetch(`/api/admin/courses/${courseId}`, {
+                  method: "PUT", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ published: !published }),
+                });
+                setPublished((v) => !v);
+                setSaveMsg(!published ? "الدورة منشورة الآن ✓" : "أصبحت مسودّة");
+                setTimeout(() => setSaveMsg(""), 2500);
+              })}
+              disabled={busy}
+            >{published ? "🙈 إخفاء الدورة" : "🚀 نشر الدورة"}</Button>
+            {saveMsg && <span className="text-xs font-bold text-brand-700">{saveMsg}</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardContent className="pt-5">
           <Label>🗓 جدول اللقاءات الأسبوعية المباشرة (يظهر في صفحة الدورة)</Label>
           <Textarea rows={3} placeholder={"مثال:\nالثلاثاء 6:00 م — تسميع جماعي\nالخميس 6:00 م — درس جديد"} value={weeklyMeetings} onChange={(e) => setWeeklyMeetings(e.target.value)} />
@@ -316,6 +377,7 @@ export function CourseBuilder() {
                         hasAudio={!!l.audioKey}
                         onChange={() => load()}
                       />
+                      <LessonResources lessonId={l.id} />
                       <div className="flex gap-2">
                         <Select value={editing[l.id].access} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], access: e.target.value } }))}>
                           <option value="ENROLLED">للمسجلات فقط</option>

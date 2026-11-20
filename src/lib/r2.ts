@@ -28,7 +28,7 @@ export function newAudioKey(kind: "submission" | "feedback", userId: string): st
 }
 
 /** Upload categories — every one of them is browser → R2 direct (the app only ever sees the key). */
-export type UploadKind = "submission" | "feedback" | "lesson" | "receipt";
+export type UploadKind = "submission" | "feedback" | "lesson" | "receipt" | "cover" | "resource";
 
 export const UPLOAD_KINDS: Record<
   UploadKind,
@@ -38,6 +38,15 @@ export const UPLOAD_KINDS: Record<
   feedback: { staffOnly: true, mimes: ["audio/webm", "audio/mp4", "audio/aac", "audio/ogg", "audio/mpeg"], maxBytes: 20 * 1024 * 1024 },
   lesson: { staffOnly: true, mimes: ["audio/webm", "audio/mp4", "audio/aac", "audio/ogg", "audio/mpeg"], maxBytes: 40 * 1024 * 1024 },
   receipt: { staffOnly: false, mimes: ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"], maxBytes: 8 * 1024 * 1024 },
+  // Course cover artwork (Udemy-style hero image) — teacher only.
+  cover: { staffOnly: true, mimes: ["image/jpeg", "image/png", "image/webp"], maxBytes: 5 * 1024 * 1024 },
+  // Downloadable lesson material: PDF, images, or an audio recitation file — teacher only.
+  resource: {
+    staffOnly: true,
+    mimes: ["application/pdf", "image/jpeg", "image/png", "image/webp", "audio/mpeg", "audio/mp4", "audio/webm", "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+    maxBytes: 40 * 1024 * 1024,
+  },
 };
 
 /** Key prefix owned by `ownerId`, used both when minting and when validating a returned key. */

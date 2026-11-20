@@ -42,8 +42,11 @@ export async function middleware(req: NextRequest) {
 
   const isAdminArea = pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
   const isStudentArea = pathname.startsWith("/dashboard") || pathname.startsWith("/lesson") || pathname.startsWith("/exam") || pathname.startsWith("/live");
+  // Public invite links for the meeting room: the page itself validates the token
+  // (and the Socket.io handshake re-validates it before any media is exchanged).
+  const isInvitedGuest = pathname.startsWith("/live/") && req.nextUrl.searchParams.has("invite");
 
-  if (isAdminArea || isStudentArea) {
+  if ((isAdminArea || isStudentArea) && !isInvitedGuest) {
     if (!session) {
       const url = req.nextUrl.clone();
       url.pathname = "/login";

@@ -100,6 +100,8 @@ model Message {
   senderId       String
   senderRole     Role
   body           String   @db.Text
+  audioKey       String? // voice note (private R2 object, browser → R2 direct)
+  audioMime      String?
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -175,6 +177,9 @@ model Course {
   level       String     @default("عام")
   published   Boolean    @default(false)
   coverColor  String     @default("#1d5fe0")
+  coverImageKey String? // uploaded cover image (private R2 object)
+  outcomes    String     @db.Text @default("") // "ستتعلّمين" bullet list, one per line
+  requirements String    @db.Text @default("") // prerequisites, one per line
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -237,8 +242,24 @@ model Lesson {
 
   module  Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   threads LessonThread[]
+  resources LessonResource[]
 
   @@index([moduleId, position])
+}
+
+// Downloadable material attached to a lesson (PDF/mushaf image/audio), private R2 object.
+model LessonResource {
+  id        String   @id @default(cuid())
+  lessonId  String
+  title     String
+  fileKey   String
+  mimeType  String
+  size      Int      @default(0)
+  createdAt DateTime @default(now())
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
 }
 
 // ---------- Per-lesson private assignment threads (Udemy-style) ----------
@@ -438,21 +459,49 @@ enum LiveStatus {
   ENDED
 }
 
+/// CLASSROOM = YouTube live broadcast + audio room (existing flow)
+/// MEETING   = fully in-house video meeting (SFU-less WebRTC mesh, no YouTube needed)
+enum RoomMode {
+  CLASSROOM
+  MEETING
+}
+
 model LiveSession {
   id            String     @id @default(cuid())
   courseId      String
   title         String
   scheduledAt   DateTime?
   youtubeVideoId String? // captured automatically by the one-click launcher
+  mode          RoomMode   @default(CLASSROOM)
   status        LiveStatus @default(SCHEDULED)
+  inviteToken   String?    @unique // public invite link token for non-registered guests
+  guestAllowed  Boolean    @default(true)
+  maxSeats      Int        @default(12) // mesh capacity guard (client CPU bound)
   startedAt     DateTime?
   endedAt       DateTime?
   createdAt     DateTime   @default(now())
 
   course      Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
   attendanceLogs AttendanceLog[]
+  chatMessages   LiveMessage[]
 
   @@index([courseId, status])
+}
+
+/// In-meeting chat (text and voice notes), visible to the room only.
+model LiveMessage {
+  id            String   @id @default(cuid())
+  liveSessionId String
+  authorName    String
+  authorRole    Role? // null = invited guest
+  body          String   @db.Text @default("")
+  audioKey      String?
+  audioMime     String?
+  createdAt     DateTime @default(now())
+
+  liveSession LiveSession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
+
+  @@index([liveSessionId, createdAt])
 }
 
 model AttendanceLog {

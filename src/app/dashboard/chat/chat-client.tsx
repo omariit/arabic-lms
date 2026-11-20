@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { VoiceNoteRecorder, VoiceNotePlayer } from "@/components/voice-note";
 
 type Conv = { id: string; subject: string; lastMessageAt: string; unread: number; preview: string; senderRole: string | null };
-type Msg = { id: string; senderId: string; senderRole: string; body: string; createdAt: string };
+type Msg = { id: string; senderId: string; senderRole: string; body: string; audioKey?: string | null; createdAt: string };
 export type ChatStrings = {
   chatKicker: string; chatTitle: string; chatStartNew: string; chatSubjectPlaceholder: string;
   chatMessagePlaceholder: string; chatSend: string; chatEmpty: string; chatBack: string; chatStaff: string;
@@ -14,6 +15,7 @@ export function StudentChat({ locale, T }: { locale: "ar" | "en"; T: ChatStrings
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
+  const [voice, setVoice] = useState<{ key: string; mime: string } | null>(null);
   const [creating, setCreating] = useState(false);
   const [newSubject, setNewSubject] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
@@ -51,12 +53,14 @@ export function StudentChat({ locale, T }: { locale: "ar" | "en"; T: ChatStrings
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || !activeId) return;
+    if ((!text && !voice) || !activeId) return;
+    const payload = { body: text, audioKey: voice?.key, audioMime: voice?.mime };
     setDraft("");
+    setVoice(null);
     await fetch(`/api/chat/${activeId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: text }),
+      body: JSON.stringify(payload),
     });
     await loadMessages(activeId);
   };
@@ -147,7 +151,8 @@ export function StudentChat({ locale, T }: { locale: "ar" | "en"; T: ChatStrings
               return (
                 <div key={m.id} className={`flex ${mine ? "justify-start" : "justify-end"}`}>
                   <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-6 shadow-sm ${mine ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-950"}`}>
-                    {m.body}
+                    {m.body && <p className="whitespace-pre-line">{m.body}</p>}
+                    {m.audioKey && <VoiceNotePlayer messageId={m.id} endpoint="/api/chat/audio/{id}" mine={mine} />}
                   </div>
                 </div>
               );
@@ -155,15 +160,21 @@ export function StudentChat({ locale, T }: { locale: "ar" | "en"; T: ChatStrings
             <div ref={bottom} />
           </div>
 
-          <div className="flex gap-2 border-t border-brand-100 p-3">
-            <input
-              className="flex-1 rounded-xl border border-brand-100 bg-brand-50/50 px-3 py-2.5 text-sm outline-none focus:border-brand-400"
-              placeholder={T.chatMessagePlaceholder}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-            />
-            <button onClick={send} className="rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-extrabold text-white">{T.chatSend}</button>
+          <div className="border-t border-brand-100 p-3">
+            {voice && (
+              <p className="mb-2 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-800">🎙 تسجيل جاهز — اضغطي إرسال</p>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                className="min-w-0 flex-1 rounded-xl border border-brand-100 bg-brand-50/50 px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+                placeholder={T.chatMessagePlaceholder}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+              />
+              <VoiceNoteRecorder kind="submission" onReady={setVoice} />
+              <button onClick={send} className="rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-extrabold text-white">{T.chatSend}</button>
+            </div>
           </div>
         </div>
       )}

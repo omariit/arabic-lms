@@ -26,7 +26,7 @@ export async function GET(req: Request) {
       lastMessageAt: c.lastMessageAt,
       unread: c.studentUnread,
       assignedToId: c.assignedToId,
-      preview: c.messages[0]?.body?.slice(0, 80) ?? "",
+      preview: c.messages[0] ? (c.messages[0].body || "🎙 رسالة صوتية").slice(0, 80) : "",
       senderRole: c.messages[0]?.senderRole ?? null,
     })),
   });

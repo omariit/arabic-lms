@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 import { sendPushToUsers } from "@/lib/push";
+import { verifyUpload } from "@/lib/r2";
 
 /** Staff: messages of a conversation (marks staffUnread = 0 = student messages read). */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -26,12 +27,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const conv = await db.conversation.findUnique({ where: { id } });
   if (!conv) return NextResponse.json({ error: "غير موجودة" }, { status: 404 });
 
-  const body = (await req.json().catch(() => ({}))) as { body?: string };
+  const body = (await req.json().catch(() => ({}))) as { body?: string; audioKey?: string; audioMime?: string };
   const text = (body.body ?? "").trim();
-  if (!text || text.length > 2000) return NextResponse.json({ error: "الرسالة فارغة أو طويلة" }, { status: 400 });
+  if (!text && !body.audioKey) return NextResponse.json({ error: "الرسالة فارغة" }, { status: 400 });
+  if (text.length > 2000) return NextResponse.json({ error: "النص طويل جدًا" }, { status: 400 });
+
+  // Staff voice note lives in the student's feedback namespace.
+  const check = await verifyUpload(body.audioKey, "feedback", conv.studentId);
+  if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
   const message = await db.message.create({
-    data: { conversationId: id, senderId: user.id, senderRole: user.role, body: text },
+    data: {
+      conversationId: id, senderId: user.id, senderRole: user.role, body: text,
+      audioKey: body.audioKey || null, audioMime: body.audioMime || null,
+    },
   });
   // replying implicitly claims the conversation when nobody handles it yet
   await db.conversation.update({
@@ -46,7 +55,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // 🔔 notify the student
   sendPushToUsers([conv.studentId], {
     title: "💬 رد جديد من فريق المعلمة",
-    body: text.slice(0, 80),
+    body: text ? text.slice(0, 80) : "🎙 رسالة صوتية",
     url: "/dashboard/chat",
     tag: `chat-${id}`,
   }).catch(() => {});

@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { viewerCountry, currencyFor } from "@/lib/pricing";
 import { countryName } from "@/lib/phone";
 import { getLocale, waLink } from "@/lib/i18n";
+import { presignGet, r2Configured } from "@/lib/r2";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { buttonVariants } from "@/components/ui/button";
 import { cn, formatSeconds } from "@/lib/utils";
@@ -81,6 +82,9 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
     ? await db.enrollmentRequest.findFirst({ where: { userId: user.id, courseId: course.id, status: "PENDING" } })
     : null;
   const teacherProfile = await db.teacherProfile.findFirst();
+  const coverUrl = course.coverImageKey && r2Configured() ? await presignGet(course.coverImageKey, 3600) : null;
+  const outcomes = (course.outcomes ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
+  const requirements = (course.requirements ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
   const isEnrolled = Boolean(enrollment);
   const canWatch = (access: string) => access === "FREE_PREVIEW" || (user && isEnrolled);
 
@@ -92,7 +96,12 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-20 pt-6">
-      <div className="rounded-3xl p-6 text-white shadow" style={{ background: course.coverColor }}>
+      <div className="overflow-hidden rounded-3xl text-white shadow" style={{ background: course.coverColor }}>
+        {coverUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={coverUrl} alt={course.title} className="h-44 w-full object-cover" />
+        )}
+        <div className="p-6">
         <h1 className="text-2xl font-extrabold">{course.title}</h1>
         <p className="mt-2 text-sm leading-7 text-white/90">{course.description}</p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -110,7 +119,29 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
             </span>
           )}
         </div>
+        </div>
       </div>
+
+      {(outcomes.length > 0 || requirements.length > 0) && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {outcomes.length > 0 && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-sm font-extrabold text-emerald-900">🎯 {ar ? "ماذا ستتعلّمين" : "What you will learn"}</p>
+              <ul className="mt-2 space-y-1 text-xs leading-6 text-emerald-900/80">
+                {outcomes.map((o) => <li key={o}>✓ {o}</li>)}
+              </ul>
+            </div>
+          )}
+          {requirements.length > 0 && (
+            <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+              <p className="text-sm font-extrabold text-brand-900">📋 {ar ? "المتطلبات" : "Requirements"}</p>
+              <ul className="mt-2 space-y-1 text-xs leading-6 text-brand-900/80">
+                {requirements.map((r) => <li key={r}>• {r}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {!isEnrolled && (
         <div className="mt-4">

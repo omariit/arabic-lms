@@ -27,13 +27,14 @@ export async function GET() {
     staff,
     conversations: conversations.map((c) => ({
       id: c.id,
+      studentId: c.studentId,
       studentName: c.student.fullName,
       studentPhone: c.student.phone,
       subject: c.subject,
       lastMessageAt: c.lastMessageAt,
       unread: c.staffUnread,
       assignedToId: c.assignedToId,
-      preview: c.messages[0]?.body?.slice(0, 80) ?? "",
+      preview: c.messages[0] ? (c.messages[0].body || "🎙 رسالة صوتية").slice(0, 80) : "",
       previewRole: c.messages[0]?.senderRole ?? null,
     })),
   });
