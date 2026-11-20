@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, Select, Label, Badge } from "@/components/ui/primitives";
@@ -21,6 +21,9 @@ export function OneClickLauncher({ youtubeConnected }: { youtubeConnected: boole
   const [yt, setYt] = useState<{ liveSessionId: string; youtubeAppUrl: string; classroomUrl: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Load her courses immediately so the meeting button is one tap away.
+  useEffect(() => { void loadCourses(); }, []);
 
   const loadCourses = async () => {
     setBusy(true);
