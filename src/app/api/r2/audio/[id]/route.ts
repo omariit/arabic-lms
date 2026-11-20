@@ -16,11 +16,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const submission = await db.audioSubmission.findUnique({ where: { id } });
   if (!submission) return NextResponse.json({ error: "الملف غير موجود" }, { status: 404 });
 
-  const isAdmin = user.role === "ADMIN";
+  // Staff (teacher/admin/assistant) may play any submission; a student only her own.
+  const isStaff = user.role !== "STUDENT";
   const attempt = await db.examAttempt.findUnique({ where: { id: submission.attemptId } });
   const isOwner = submission.userId === user.id;
   const isFeedback = attempt?.feedbackAudioKey === submission.audioKey;
-  if (!isAdmin && !isOwner && !isFeedback) {
+  if (!isStaff && !isOwner && !isFeedback) {
     return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
   }
   if (!r2Configured()) return NextResponse.json({ error: "التخزين غير مهيأ" }, { status: 503 });

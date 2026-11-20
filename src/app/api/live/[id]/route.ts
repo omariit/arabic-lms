@@ -15,8 +15,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
   if (!live) return NextResponse.json({ error: "الحصة غير موجودة" }, { status: 404 });
 
-  const isAdmin = user.role === "ADMIN";
-  if (!isAdmin) {
+  // Staff run the room, so they are not required to be enrolled themselves.
+  const isStaff = user.role !== "STUDENT";
+  if (!isStaff) {
     const enrollment = await db.enrollment.findFirst({
       where: { userId: user.id, courseId: live.courseId, status: "ACTIVE" },
     });
