@@ -65,7 +65,13 @@ async function main() {
   if (profile) await db.teacherProfile.update({ where: { id: profile.id }, data: profileData });
   else await db.teacherProfile.create({ data: profileData });
 
-  // Fresh QA course each run.
+  // Fresh QA course each run. Recordings are detached (SetNull) on course deletion,
+  // so clear them explicitly first — otherwise a new run hits "lesson already has
+  // a recording" on the very first studio start.
+  const stale = await db.course.findMany({ where: { title: { startsWith: QA_MARK } }, select: { id: true } });
+  if (stale.length) {
+    await db.recordingSession.deleteMany({ where: { courseId: { in: stale.map((c) => c.id) } } });
+  }
   await db.course.deleteMany({ where: { title: { startsWith: QA_MARK } } });
 
   const course = await db.course.create({

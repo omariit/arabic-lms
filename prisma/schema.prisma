@@ -46,6 +46,7 @@ model User {
   conversations      Conversation[]
   pushSubscriptions  PushSubscription[]
   lessonThreads      LessonThread[]
+  recordings         RecordingSession[] @relation("RecordingTeacher")
 
   @@index([role])
 }
@@ -191,6 +192,7 @@ model Course {
   vouchers          Voucher[]
   prices            CoursePrice[]
   weeklyMeetings    String        @db.Text @default("") // multiline, e.g. "الثلاثاء 6:00 م"
+  recordings        RecordingSession[]
 
   @@index([published])
 }
@@ -243,6 +245,7 @@ model Lesson {
   module  Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   threads LessonThread[]
   resources LessonResource[]
+  recording RecordingSession?
 
   @@index([moduleId, position])
 }
@@ -531,4 +534,50 @@ model Testimonial {
   createdAt DateTime @default(now())
 
   @@index([published])
+}
+
+// ---------- Lesson recordings (Teaching Studio) ----------
+
+// One row per recording session started from the teacher studio.
+// Files themselves live in the separate `recording-service` volume; this table is
+// the durable status/health record the teacher and admin dashboards read, and it
+// survives service restarts because the service writes the same state to its disk.
+enum RecordingStatus {
+  RECORDING
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+  ABORTED
+  EXPIRED
+}
+
+model RecordingSession {
+  id            String          @id @default(cuid())
+  serviceId     String          @unique // session id inside recording-service
+  title         String
+  teacherId     String
+  courseId      String?
+  lessonId      String?         @unique // one recording per lesson
+  status        RecordingStatus @default(RECORDING)
+  stage         String          @default("created") // probe | normalize | transcode | concat | thumbnail | ready
+  progress      Int             @default(0)
+  chunkCount    Int             @default(0)
+  bytesReceived Int             @default(0)
+  durationSec   Int?
+  sizeBytes     Int?
+  hasVideo      Boolean         @default(false)
+  errorMessage  String?
+  startedAt     DateTime        @default(now())
+  finalizedAt   DateTime?
+  readyAt       DateTime?
+  updatedAt     DateTime        @updatedAt
+
+  teacher User    @relation("RecordingTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  course  Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  lesson  Lesson? @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([teacherId, startedAt])
+  @@index([lessonId])
 }

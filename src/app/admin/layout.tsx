@@ -8,6 +8,8 @@ import { LogoutButton } from "@/components/logout-button";
 const NAV = [
   { href: "/admin/chat", label: "الرسائل", icon: "📨", staff: true, badge: true },
   { href: "/admin", label: "الرئيسية", icon: "🏠", teacher: true },
+  { href: "/admin/studio", label: "استوديو التسجيل", icon: "🎬", teacher: true },
+  { href: "/admin/recordings", label: "التسجيلات", icon: "📼", teacher: true },
   { href: "/admin/live", label: "الحصص المباشرة", icon: "🔴", teacher: true },
   { href: "/admin/grading", label: "التصحيح", icon: "🎤", teacher: true },
   { href: "/admin/enrollments", label: "التسجيلات", icon: "✅", teacher: true },

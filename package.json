@@ -12,7 +12,8 @@
     "qa:seed": "node prisma/seed-qa.mjs",
     "qa": "playwright test",
     "qa:report": "playwright show-report qa-report",
-    "qa:smoke": "playwright test tests/e2e/06-smoke.spec.ts"
+    "qa:smoke": "playwright test tests/e2e/06-smoke.spec.ts",
+    "recording:test": "cd recording-service && node --test tests"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

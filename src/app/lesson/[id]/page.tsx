@@ -5,6 +5,7 @@ import { ProtectedPlayer } from "@/components/protected-player";
 import { LessonWorkspace } from "./lesson-workspace";
 import { LessonAudioPlayer } from "@/components/lesson-audio";
 import { LessonResourcesView } from "@/components/course-extras";
+import { RecordedVideo } from "@/components/recorded-video";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +18,11 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
 
   const lesson = await db.lesson.findUnique({
     where: { id },
-    include: { module: { include: { course: true } }, resources: true },
+    include: {
+      module: { include: { course: true } },
+      resources: true,
+      recording: { select: { id: true, title: true, status: true, hasVideo: true, durationSec: true } },
+    },
   });
   if (!lesson) {
     return <main className="mx-auto max-w-3xl px-4 py-16 text-center">الدرس غير موجود</main>;
@@ -44,7 +49,31 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
       </p>
       <h1 className="mb-4 text-2xl font-extrabold">{lesson.title}</h1>
 
-      <ProtectedPlayer lessonId={lesson.id} studentName={user.fullName} studentPhone={user.phone} />
+      {lesson.recording?.hasVideo && lesson.recording.status === "READY" ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-extrabold text-brand-900">🎥 فيديو الحصة المسجّل</p>
+            <span className="text-[11px] text-gray-500">
+              {lesson.recording.durationSec ? `${Math.round(lesson.recording.durationSec / 60)} دقيقة` : ""}
+            </span>
+          </div>
+          <RecordedVideo
+            recordingId={lesson.recording.id}
+            title={lesson.recording.title}
+            studentName={user.fullName}
+            studentPhone={user.phone}
+            poster={`/api/recordings/${lesson.recording.id}/thumbnail`}
+          />
+          <details className="rounded-2xl border border-brand-100 bg-white p-3">
+            <summary className="cursor-pointer text-xs font-extrabold text-brand-700">▶️ مشاهدة الفيديو الأصلي (يوتيوب)</summary>
+            <div className="mt-3">
+              <ProtectedPlayer lessonId={lesson.id} studentName={user.fullName} studentPhone={user.phone} />
+            </div>
+          </details>
+        </div>
+      ) : (
+        <ProtectedPlayer lessonId={lesson.id} studentName={user.fullName} studentPhone={user.phone} />
+      )}
 
       {lesson.audioKey && <div className="mt-4"><LessonAudioPlayer lessonId={lesson.id} title={lesson.title} /></div>}
 

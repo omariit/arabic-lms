@@ -12,6 +12,18 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Docker builds only receive service variables that are declared here. Next.js
+# inlines NEXT_PUBLIC_* into the client bundle at build time, so they MUST be
+# declared as build args or the browser gets `undefined` (this silently broke
+# the recording studio, whose uploads go straight to the recording service).
+ARG NEXT_PUBLIC_RECORDING_SERVICE_URL=""
+ENV NEXT_PUBLIC_RECORDING_SERVICE_URL=$NEXT_PUBLIC_RECORDING_SERVICE_URL
+ARG NEXT_PUBLIC_APP_URL=""
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY=""
+ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+ARG NEXT_PUBLIC_TURN_URL=""
+ENV NEXT_PUBLIC_TURN_URL=$NEXT_PUBLIC_TURN_URL
 # AUTH_SECRET stub only for build-time evaluation safety; real value injected at runtime
 RUN npm run build
 

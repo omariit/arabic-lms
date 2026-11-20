@@ -35,7 +35,7 @@ test.describe("production smoke (read-only)", () => {
     const screens = [
       "/admin", "/admin/chat", "/admin/live", "/admin/enrollments", "/admin/courses",
       "/admin/grading", "/admin/profile", "/admin/vouchers", "/admin/testimonials",
-      "/admin/landing", "/admin/staff", "/admin/violations",
+      "/admin/landing", "/admin/staff", "/admin/violations", "/admin/studio", "/admin/recordings",
     ];
     for (const url of screens) {
       const res = await page.goto(url, { waitUntil: "networkidle" });
