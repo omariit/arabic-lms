@@ -6,6 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn, formatDateAr } from "@/lib/utils";
 import { getLocale, t } from "@/lib/i18n";
 import { VoucherRedeem } from "./voucher-redeem";
+import { ExamFeedback } from "@/components/exam-feedback";
 import { PushManager } from "@/components/push-manager";
 import { InstallPrompt } from "@/components/install-prompt";
 import { LogoutButton } from "@/components/logout-button";
@@ -45,7 +46,9 @@ export default async function StudentDashboard() {
     }),
     db.examAttempt.findMany({
       where: { userId: user.id, status: { in: ["SUBMITTED", "GRADED"] } },
-      include: { exam: { select: { title: true, maxGrade: true } } },
+      include: {
+        exam: { select: { title: true, maxGrade: true } },
+      },
       orderBy: { submittedAt: "desc" },
       take: 5,
     }),
@@ -161,14 +164,19 @@ export default async function StudentDashboard() {
           <Card>
             <CardContent className="divide-y divide-brand-50">
               {attempts.map((a) => (
-                <div key={a.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-bold">{a.exam.title}</p>
-                    <p className="text-xs text-gray-400">{formatDateAr(a.submittedAt ?? a.startedAt)}</p>
+                <div key={a.id} className="py-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold">{a.exam.title}</p>
+                      <p className="text-xs text-gray-400">{formatDateAr(a.submittedAt ?? a.startedAt)}</p>
+                    </div>
+                    <Badge tone={a.status === "GRADED" ? "green" : "amber"}>
+                      {a.status === "GRADED" ? `${a.manualGrade ?? a.autoScore ?? 0} / ${a.exam.maxGrade}` : "بانتظار التصحيح"}
+                    </Badge>
                   </div>
-                  <Badge tone={a.status === "GRADED" ? "green" : "amber"}>
-                    {a.status === "GRADED" ? `${a.manualGrade ?? a.autoScore ?? 0} / ${a.exam.maxGrade}` : "بانتظار التصحيح"}
-                  </Badge>
+                  {a.status === "GRADED" && (a.feedbackText || a.feedbackAudioKey) && (
+                    <ExamFeedback attemptId={a.id} label="🎧 تصحيح المعلمة وملاحظاتها" />
+                  )}
                 </div>
               ))}
             </CardContent>
