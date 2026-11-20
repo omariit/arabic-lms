@@ -17,15 +17,12 @@ export function GuestMeeting({
   inviteToken: string;
 }) {
   const [name, setName] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
 
+  // Restore a name the guest already used in this tab (no server round-trip).
   useEffect(() => {
     const saved = sessionStorage.getItem(`guest-${liveId}`);
     if (saved) setName(saved);
-    setReady(true);
   }, [liveId]);
-
-  if (!ready) return null;
 
   if (!name) {
     return <GuestEntry liveId={liveId} title={title} onEnter={(n) => setName(n)} />;
