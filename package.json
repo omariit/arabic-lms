@@ -11,7 +11,8 @@
     "db:push": "prisma db push",
     "qa:seed": "node prisma/seed-qa.mjs",
     "qa": "playwright test",
-    "qa:report": "playwright show-report qa-report"
+    "qa:report": "playwright show-report qa-report",
+    "qa:smoke": "playwright test tests/e2e/06-smoke.spec.ts"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

@@ -43,3 +43,12 @@ npx playwright show-report qa-report
 - **كل فشل يُحفظ**: صورة + فيديو + trace في `qa-report/`.
 - الاختبارات ملفوفة بـ `retries: 1` لأن Railway قد يبرد (cold start)؛ الفشل المتكرر يعني خللًا حقيقيًا.
 - الحسابات: `0790000001..6` بكلمة مرور `qa-pass-2026` (staging فقط).
+
+## فحص الإنتاج (قراءة فقط، لا يلمس البيانات)
+
+```bash
+QA_SMOKE=1 SMOKE_TEACHER_PASSWORD="..." QA_BASE_URL=https://arabic-lms-production.up.railway.app npm run qa:smoke
+```
+
+يفتح كل شاشات لوحة المعلمة على الإنتاج ويفشل إذا ظهر أي طلب API مرفوض أو خطأ صفحة —
+هذا هو الفحص الذي يمنع تكرار مشكلة «401 في كل مكان» من الوصول للمستخدمات.
