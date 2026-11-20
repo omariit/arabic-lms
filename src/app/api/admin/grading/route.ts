@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 import { sendPushToUsers } from "@/lib/push";
-import { r2Configured, newAudioKey, presignPut, presignGet } from "@/lib/r2";
+import { r2Configured, presignGet, verifyUpload } from "@/lib/r2";
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 /**
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
   const queue = await db.examAttempt.findMany({
     where: { status: "SUBMITTED", exam: { type: "VOICE" } },
     include: {
-      user: { select: { fullName: true, phone: true } },
+      user: { select: { id: true, fullName: true, phone: true } },
       exam: { select: { title: true, maxGrade: true } },
       audioFiles: { select: { id: true, createdAt: true } },
     },
@@ -73,21 +73,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `الدرجة يجب أن تكون بين 0 و ${attempt.exam.maxGrade}` }, { status: 400 });
   }
 
-  // Optional: presign an upload for the teacher's voice feedback note (recorded in-phone).
-  let voiceUpload: { uploadUrl: string; key: string } | null = null;
-  if (body.voiceNoteKey === "NEW") {
-    if (!r2Configured()) return NextResponse.json({ error: "التخزين غير مهيأ" }, { status: 503 });
-    const key = newAudioKey("feedback", attempt.userId);
-    const uploadUrl = await presignPut(key, "audio/mp4", 300);
-    voiceUpload = { uploadUrl, key };
-  }
+  // Voice feedback was uploaded browser → R2 first; here we only accept its key.
+  const check = body.voiceNoteKey && body.voiceNoteKey !== "NEW"
+    ? await verifyUpload(body.voiceNoteKey, "feedback", attempt.userId)
+    : { ok: true as const };
+  if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
   await db.examAttempt.update({
     where: { id: attempt.id },
     data: {
       manualGrade: grade ?? attempt.manualGrade,
       feedbackText: body.feedbackText ?? attempt.feedbackText,
-      feedbackAudioKey: voiceUpload ? voiceUpload.key : attempt.feedbackAudioKey,
+      feedbackAudioKey: body.voiceNoteKey && body.voiceNoteKey !== "NEW" ? body.voiceNoteKey : attempt.feedbackAudioKey,
       status: "GRADED",
     },
   });
@@ -100,5 +97,5 @@ export async function POST(req: Request) {
     tag: `exam-${attempt.id}`,
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true, voiceUpload });
+  return NextResponse.json({ ok: true });
 }

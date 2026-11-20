@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
@@ -25,6 +25,59 @@ export function r2Configured(): boolean {
 export function newAudioKey(kind: "submission" | "feedback", userId: string): string {
   const date = new Date().toISOString().slice(0, 10);
   return `${kind}/${date}/${userId}/${randomUUID()}`;
+}
+
+/** Upload categories — every one of them is browser → R2 direct (the app only ever sees the key). */
+export type UploadKind = "submission" | "feedback" | "lesson" | "receipt";
+
+export const UPLOAD_KINDS: Record<
+  UploadKind,
+  { staffOnly: boolean; mimes: string[]; maxBytes: number }
+> = {
+  submission: { staffOnly: false, mimes: ["audio/webm", "audio/mp4", "audio/aac", "audio/ogg", "audio/mpeg"], maxBytes: 20 * 1024 * 1024 },
+  feedback: { staffOnly: true, mimes: ["audio/webm", "audio/mp4", "audio/aac", "audio/ogg", "audio/mpeg"], maxBytes: 20 * 1024 * 1024 },
+  lesson: { staffOnly: true, mimes: ["audio/webm", "audio/mp4", "audio/aac", "audio/ogg", "audio/mpeg"], maxBytes: 40 * 1024 * 1024 },
+  receipt: { staffOnly: false, mimes: ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"], maxBytes: 8 * 1024 * 1024 },
+};
+
+/** Key prefix owned by `ownerId`, used both when minting and when validating a returned key. */
+export function keyPrefix(kind: UploadKind, ownerId: string): string {
+  return `${kind}/${new Date().toISOString().slice(0, 10)}/${ownerId}/`;
+}
+
+/** A key is only accepted if it sits inside the namespace we minted for that owner. */
+export function keyBelongsTo(key: string, kind: UploadKind, ownerId: string): boolean {
+  return key.startsWith(keyPrefix(kind, ownerId)) && !key.includes("..");
+}
+
+/** Metadata check without downloading the object (used instead of proxying bytes). */
+export async function headObject(key: string): Promise<{ size: number; contentType: string } | null> {
+  if (!r2Configured()) return null;
+  try {
+    const out = await client().send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+    return { size: Number(out.ContentLength ?? 0), contentType: out.ContentType ?? "" };
+  } catch {
+    return null;
+  }
+}
+
+/** Validate an uploaded object: it must exist, be within the kind's limits, and match its MIME family. */
+export async function verifyUpload(
+  key: string | null | undefined,
+  kind: UploadKind,
+  ownerId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!key) return { ok: true };
+  if (!keyBelongsTo(key, kind, ownerId)) return { ok: false, error: "مفتاح الملف غير صالح" };
+  const meta = await headObject(key);
+  if (!meta) return { ok: false, error: "الملف غير موجود في التخزين" };
+  const rule = UPLOAD_KINDS[kind];
+  if (meta.size <= 0) return { ok: false, error: "الملف فارغ" };
+  if (meta.size > rule.maxBytes) return { ok: false, error: "حجم الملف أكبر من المسموح" };
+  if (meta.contentType && !rule.mimes.includes(meta.contentType.split(";")[0])) {
+    return { ok: false, error: "نوع الملف غير مسموح" };
+  }
+  return { ok: true };
 }
 
 /** Short-lived presigned PUT so the browser uploads straight to R2 (zero Railway bandwidth). */

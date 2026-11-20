@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
+import { presignGet, r2Configured } from "@/lib/r2";
 
 /**
  * Enrollment management:
@@ -23,7 +24,17 @@ export async function GET() {
       take: 200,
     }),
   ]);
-  return NextResponse.json({ requests, enrollments });
+  // Short-lived receipt links (images live in a private bucket).
+  const withReceipts = r2Configured()
+    ? await Promise.all(
+        requests.map(async (r) => ({
+          ...r,
+          receiptUrl: r.receiptKey ? await presignGet(r.receiptKey, 600) : null,
+        })),
+      )
+    : requests.map((r) => ({ ...r, receiptUrl: null }));
+
+  return NextResponse.json({ requests: withReceipts, enrollments });
 }
 
 export async function PATCH(req: Request) {

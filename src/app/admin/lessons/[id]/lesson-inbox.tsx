@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { mimeToFileExtension, useAudioRecorder } from "@/hooks/use-audio-recorder";
+import { useAudioRecorder } from "@/hooks/use-audio-recorder";
+import { uploadToR2 } from "@/lib/upload-client";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/primitives";
 
@@ -79,15 +80,8 @@ export function LessonInbox({ lesson }: { lesson: Lesson }) {
     try {
       let voice: { key: string; mime: string } | null = null;
       if (rec.blob) {
-        const presignRes = await fetch("/api/r2/upload", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: "feedback", mimeType: rec.mimeType }),
-        });
-        const presign = await presignRes.json();
-        if (!presignRes.ok) throw new Error(presign.error ?? "تعذّر الرفع");
-        const up = await fetch(presign.uploadUrl, { method: "PUT", headers: { "Content-Type": presign.contentType }, body: rec.blob });
-        if (!up.ok) throw new Error("فشل رفع التسجيل");
-        voice = { key: presign.key, mime: presign.contentType };
+        const up = await uploadToR2(rec.blob, { kind: "feedback", mimeType: rec.mimeType, forUser: active ?? undefined });
+        voice = { key: up.key, mime: up.mimeType };
       }
       const res = await fetch(`/api/admin/lessons/${lesson.id}/threads/${active}`, {
         method: "POST", headers: { "Content-Type": "application/json" },

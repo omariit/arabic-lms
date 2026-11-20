@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 import { sendPushToUsers } from "@/lib/push";
+import { verifyUpload } from "@/lib/r2";
 
 /**
  * Staff ↔ one student inside a lesson thread.
@@ -35,6 +36,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const text = (body.body ?? "").trim();
   if (!text && !body.audioKey) return NextResponse.json({ error: "الرسالة فارغة" }, { status: 400 });
   if (text.length > 4000) return NextResponse.json({ error: "النص طويل جدًا" }, { status: 400 });
+
+  // Staff reply audio lives in the student's feedback namespace and is validated by HEAD.
+  const check = await verifyUpload(body.audioKey, "feedback", studentId);
+  if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
   const message = await db.lessonMessage.create({
     data: {

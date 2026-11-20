@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { mimeToFileExtension, useAudioRecorder } from "@/hooks/use-audio-recorder";
+import { useAudioRecorder } from "@/hooks/use-audio-recorder";
+import { uploadToR2 } from "@/lib/upload-client";
 import { Button } from "@/components/ui/button";
 
 type Msg = { id: string; senderId: string; senderRole: string; body: string; audioKey?: string | null; audioMime?: string | null; createdAt: string };
@@ -57,16 +58,8 @@ export function LessonWorkspace({ lessonId, initialAssignment }: { lessonId: str
 
   const uploadVoice = async (): Promise<{ key: string; mime: string } | null> => {
     if (!rec.blob) return null;
-    const presignRes = await fetch("/api/r2/upload", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "submission", mimeType: rec.mimeType }),
-    });
-    const presign = await presignRes.json();
-    if (!presignRes.ok) throw new Error(presign.error ?? "تعذّر تجهيز الرفع");
-    const ext = mimeToFileExtension(rec.mimeType);
-    const up = await fetch(presign.uploadUrl, { method: "PUT", headers: { "Content-Type": presign.contentType }, body: rec.blob });
-    if (!up.ok) throw new Error("فشل رفع التسجيل");
-    return { key: presign.key, mime: presign.contentType };
+    const up = await uploadToR2(rec.blob, { kind: "submission", mimeType: rec.mimeType });
+    return { key: up.key, mime: up.mimeType };
   };
 
   const previewUrl = useRef<string | null>(null);

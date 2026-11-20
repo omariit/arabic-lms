@@ -4,10 +4,11 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Badge, Textarea } from "@/components/ui/primitives";
+import { LessonAudioUploader } from "@/components/lesson-audio";
 import { COUNTRIES, countryName } from "@/lib/phone";
 
 type Module = { id: string; title: string; position: number; lessons: Lesson[] };
-type Lesson = { id: string; title: string; youtubeId: string; access: string; position: number; description?: string; scriptText?: string; assignmentTitle?: string | null; assignmentInstructions?: string };
+type Lesson = { id: string; title: string; youtubeId: string; access: string; position: number; description?: string; scriptText?: string; assignmentTitle?: string | null; assignmentInstructions?: string; audioKey?: string | null };
 type CoursePrice = { id?: string; countryCode: string; price: number };
 type CourseInfo = { price: number; weeklyMeetings: string; prices: CoursePrice[]; modules: Module[] };
 
@@ -310,6 +311,11 @@ export function CourseBuilder() {
                       <Textarea rows={4} placeholder="السكريبت / النص الكامل للدرس" value={editing[l.id].scriptText} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], scriptText: e.target.value } }))} />
                       <Input placeholder="عنوان الواجب (اختياري)" value={editing[l.id].assignmentTitle} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], assignmentTitle: e.target.value } }))} />
                       <Textarea rows={3} placeholder="تعليمات الواجب" value={editing[l.id].assignmentInstructions} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], assignmentInstructions: e.target.value } }))} />
+                      <LessonAudioUploader
+                        lessonId={l.id}
+                        hasAudio={!!l.audioKey}
+                        onChange={() => load()}
+                      />
                       <div className="flex gap-2">
                         <Select value={editing[l.id].access} onChange={(e) => setEditing((f) => ({ ...f, [l.id]: { ...f[l.id], access: e.target.value } }))}>
                           <option value="ENROLLED">للمسجلات فقط</option>

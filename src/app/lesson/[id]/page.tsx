@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireStudent } from "@/lib/auth";
 import { ProtectedPlayer } from "@/components/protected-player";
 import { LessonWorkspace } from "./lesson-workspace";
+import { LessonAudioPlayer } from "@/components/lesson-audio";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,8 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
       <h1 className="mb-4 text-2xl font-extrabold">{lesson.title}</h1>
 
       <ProtectedPlayer lessonId={lesson.id} studentName={user.fullName} studentPhone={user.phone} />
+
+      {lesson.audioKey && <div className="mt-4"><LessonAudioPlayer lessonId={lesson.id} title={lesson.title} /></div>}
 
       <p className="mt-3 rounded-xl bg-brand-50 p-3 text-xs text-brand-800">
         🛡️ هذا الدرس محمي بعلامة مائية باسمك ورقم هاتفك — محاولات التسريب تُسجَّل وتؤدي لإيقاف الحساب.

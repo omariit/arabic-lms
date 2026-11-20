@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { verifyUpload } from "@/lib/r2";
 
 /** Student: submit an enrollment request with a CliQ/bank transfer receipt reference. */
 export async function POST(req: Request) {
@@ -12,13 +13,18 @@ export async function POST(req: Request) {
   if (!rl.ok) return rateLimitResponse(rl.retryAfter);
 
   const body = (await req.json().catch(() => ({}))) as {
-    courseId?: string; receiptRef?: string; note?: string; expectedPrice?: number; countryCode?: string;
+    courseId?: string; receiptRef?: string; receiptKey?: string;
+    note?: string; expectedPrice?: number; countryCode?: string;
   };
   if (!body.courseId || !body.receiptRef?.trim()) {
     return NextResponse.json({ error: "مرجع الإيصال مطلوب" }, { status: 400 });
   }
   const course = await db.course.findUnique({ where: { id: body.courseId } });
   if (!course) return NextResponse.json({ error: "الدورة غير موجودة" }, { status: 404 });
+
+  // Transfer screenshot was uploaded straight to R2; only the key arrives here.
+  const check = await verifyUpload(body.receiptKey, "receipt", user.id);
+  if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
   const existing = await db.enrollmentRequest.findFirst({
     where: { userId: user.id, courseId: course.id, status: "PENDING" },
@@ -33,6 +39,7 @@ export async function POST(req: Request) {
       userId: user.id,
       courseId: course.id,
       receiptRef: body.receiptRef.trim(),
+      receiptKey: body.receiptKey || null,
       note: [priceLine, body.note?.trim()].filter(Boolean).join(" ") || null,
     },
   });

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, Progress } from "@/components/ui/primitives";
-import { mimeToFileExtension, useAudioRecorder } from "@/hooks/use-audio-recorder";
+import { useAudioRecorder } from "@/hooks/use-audio-recorder";
+import { uploadToR2 } from "@/lib/upload-client";
 
 /**
  * Voice exam: cross-browser recording (webm/opus on Chrome/Android, mp4/AAC on
@@ -21,29 +22,14 @@ export function VoiceExam({ examId, title, durationMin }: { examId: string; titl
     setUploading(true);
     setMsg(null);
     try {
-      // 1. Presigned PUT (server validates enrollment + mime).
-      const presignRes = await fetch("/api/r2/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "submission", mimeType: rec.mimeType }),
-      });
-      const presign = await presignRes.json();
-      if (!presignRes.ok) throw new Error(presign.error ?? "تعذّر تجهيز الرفع");
+      // 1+2. Presigned PUT, then browser -> R2 direct (no app-server bandwidth).
+      const upload = await uploadToR2(rec.blob, { kind: "submission", mimeType: rec.mimeType });
 
-      // 2. Direct browser -> R2 upload (no Railway bandwidth).
-      const ext = mimeToFileExtension(rec.mimeType);
-      const uploadRes = await fetch(presign.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": presign.contentType },
-        body: rec.blob,
-      });
-      if (!uploadRes.ok) throw new Error("فشل رفع الملف إلى التخزين");
-
-      // 3. Register the submission server-side.
+      // 3. Register the submission server-side (key only; bytes already in R2).
       const subRes = await fetch("/api/exams/voice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ examId, key: presign.key, mimeType: presign.contentType }),
+        body: JSON.stringify({ examId, key: upload.key, mimeType: upload.mimeType }),
       });
       const sub = await subRes.json();
       if (!subRes.ok) throw new Error(sub.error ?? "تعذّر تسجيل الإرسال");

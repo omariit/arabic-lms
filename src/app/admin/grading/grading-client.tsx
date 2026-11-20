@@ -3,11 +3,12 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/primitives";
+import { uploadToR2 } from "@/lib/upload-client";
 
 /** Mobile voice grading queue: listen (presigned GET), grade, text note, record voice feedback. */
 export function GradingClient() {
   const [queue, setQueue] = useState<Array<{
-    id: string; user: { fullName: string; phone: string }; exam: { title: string; maxGrade: number };
+    id: string; user: { id: string; fullName: string; phone: string }; exam: { title: string; maxGrade: number };
     audioFiles: Array<{ id: string }>; manualGrade?: number | null; feedbackText?: string | null;
   }>>([]);
   const [loaded, setLoaded] = useState(false);
@@ -65,31 +66,29 @@ export function GradingClient() {
     mediaRef.current?.stream.getTracks().forEach((t) => t.stop());
   };
 
-  const saveGrade = async (attemptId: string, maxGrade: number) => {
+  const saveGrade = async (attemptId: string, maxGrade: number, studentId: string) => {
     setBusy(true);
     try {
       const hasRecording = recording === "done" && chunksRef.current.length > 0;
-      let body: Record<string, unknown> = {
+      const body: Record<string, unknown> = {
         attemptId,
         manualGrade: Math.min(maxGrade, Math.max(0, Number(grade) || 0)),
         feedbackText: note,
       };
-      if (hasRecording) body.voiceNoteKey = "NEW"; // request a presigned PUT for the voice note
 
-      let res = await fetch("/api/admin/grading", {
+      // Voice feedback goes browser → R2 directly; only its key is posted below.
+      if (hasRecording) {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const up = await uploadToR2(blob, { kind: "feedback", mimeType, forUser: studentId });
+        body.voiceNoteKey = up.key;
+      }
+
+      const res = await fetch("/api/admin/grading", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-
-      if (hasRecording && data.voiceUpload) {
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        const up = await fetch(data.voiceUpload.uploadUrl, {
-          method: "PUT", headers: { "Content-Type": "audio/mp4" }, body: blob,
-        });
-        if (!up.ok) throw new Error("فشل رفع التعليق الصوتي");
-      }
       setOpenId(null);
       setRecording("idle");
       await load();
@@ -141,7 +140,7 @@ export function GradingClient() {
           </div>
 
           <div className="flex gap-2">
-            <Button className="flex-1" onClick={() => saveGrade(item.id, item.exam.maxGrade)} disabled={busy}>
+            <Button className="flex-1" onClick={() => saveGrade(item.id, item.exam.maxGrade, item.user.id)} disabled={busy}>
               {busy ? "…" : "حفظ التصحيح"}
             </Button>
             <Button variant="outline" onClick={() => { setOpenId(null); setRecording("idle"); }}>إلغاء</Button>

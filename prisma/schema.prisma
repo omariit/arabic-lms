@@ -233,6 +233,7 @@ model Lesson {
   scriptText  String   @db.Text @default("") // lesson script/transcript
   assignmentTitle String?
   assignmentInstructions String @db.Text @default("") // empty = no assignment
+  audioKey   String? // teacher's own recording of the lesson (private R2 object)
 
   module  Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   threads LessonThread[]
@@ -312,6 +313,7 @@ model EnrollmentRequest {
   userId     String
   courseId   String
   receiptRef String // CliQ/bank transfer reference or receipt note
+  receiptKey String? // R2 key of the uploaded transfer screenshot (browser → R2 direct)
   note       String?
   status     RequestStatus @default(PENDING)
   decidedAt  DateTime?

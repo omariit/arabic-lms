@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { uploadToR2 } from "@/lib/upload-client";
 import { Card, CardContent, Input, Label, Textarea } from "@/components/ui/primitives";
 
 /** Paid-enrollment flow: shows country-specific price + financial details + WhatsApp, then receipt reference. */
@@ -18,6 +19,7 @@ export function EnrollActions({ courseId, price, currency, monthly, viewerCountr
 }) {
   const [tab, setTab] = useState<"request" | "voucher">("request");
   const [receiptRef, setReceiptRef] = useState("");
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
   const [code, setCode] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -29,15 +31,22 @@ export function EnrollActions({ courseId, price, currency, monthly, viewerCountr
     e.preventDefault();
     setLoading(true); setMsg(null);
     try {
+      // Screenshot goes browser → R2 directly; only its key is sent with the request.
+      let receiptKey: string | undefined;
+      if (receiptFile) {
+        const up = await uploadToR2(receiptFile, { kind: "receipt", mimeType: receiptFile.type, filename: receiptFile.name });
+        receiptKey = up.key;
+      }
       const res = await fetch("/api/student/enroll-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId, receiptRef, note, expectedPrice: price, countryCode: viewerCountry }),
+        body: JSON.stringify({ courseId, receiptRef, receiptKey, note, expectedPrice: price, countryCode: viewerCountry }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setMsg({ ok: true, text: "تم إرسال الطلب — بانتظار موافقة المعلمة" });
       setReceiptRef("");
+      setReceiptFile(null);
     } catch (err) {
       setMsg({ ok: false, text: err instanceof Error ? err.message : "خطأ" });
     } finally { setLoading(false); }
@@ -101,6 +110,17 @@ export function EnrollActions({ courseId, price, currency, monthly, viewerCountr
                 <div>
                   <Label htmlFor="receipt">مرجع الإيصال / رقم الحوالة</Label>
                   <Input id="receipt" value={receiptRef} onChange={(e) => setReceiptRef(e.target.value)} required />
+                </div>
+                <div>
+                  <Label htmlFor="receiptFile">صورة الإيصال (اختياري)</Label>
+                  <input
+                    id="receiptFile"
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+                    className="block w-full rounded-xl border border-gray-200 bg-white p-2 text-sm file:me-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-white"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-500">تُرفع الصورة من جهازك مباشرة إلى التخزين — لا تمرّ عبر الخادم.</p>
                 </div>
                 <div>
                   <Label htmlFor="note">ملاحظة (اختياري)</Label>

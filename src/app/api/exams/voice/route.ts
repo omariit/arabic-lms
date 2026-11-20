@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { verifyUpload } from "@/lib/r2";
 
 /** Register a voice-exam submission after the browser uploaded the audio to R2. */
 export async function POST(req: Request) {
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
   if (!rl.ok) return rateLimitResponse(rl.retryAfter);
 
   const body = (await req.json().catch(() => ({}))) as {
-    examId?: string; key?: string; mimeType?: string; audioId?: string;
+    examId?: string; key?: string; mimeType?: string;
   };
   if (!body.examId || !body.key) return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
 
@@ -40,11 +41,9 @@ export async function POST(req: Request) {
     });
   }
 
-  // Cross-check the R2 key actually belongs to this user's submission namespace.
-  if (!body.key.startsWith(`submission/${new Date().toISOString().slice(0, 10)}/${user.id}/`) &&
-      !body.audioId) {
-    return NextResponse.json({ error: "مفتاح الملف غير صالح" }, { status: 400 });
-  }
+  // The audio was uploaded browser → R2 directly; validate the key by HEAD, no bytes here.
+  const check = await verifyUpload(body.key, "submission", user.id);
+  if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
   const submission = await db.audioSubmission.create({
     data: {

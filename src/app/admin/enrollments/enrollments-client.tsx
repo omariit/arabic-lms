@@ -7,7 +7,7 @@ import { Badge, Card, CardContent } from "@/components/ui/primitives";
 /** Enrollments: one-tap approve/reject of receipt requests + manual grants. */
 export function EnrollmentsClient() {
   const [data, setData] = useState<{
-    requests: Array<{ id: string; user: { fullName: string; phone: string }; course: { title: string }; receiptRef: string; note?: string | null; status: string; createdAt: string }>;
+    requests: Array<{ id: string; user: { fullName: string; phone: string }; course: { title: string }; receiptRef: string; receiptUrl?: string | null; note?: string | null; status: string; createdAt: string }>;
     enrollments: Array<{ id: string; user: { fullName: string }; course: { title: string }; status: string; grantedVia: string }>;
   } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,6 +67,12 @@ export function EnrollmentsClient() {
                   <p className="font-bold">{r.user.fullName} <span className="text-xs text-gray-400" dir="ltr">{r.user.phone}</span></p>
                   <p className="text-sm text-gray-600">{r.course.title}</p>
                   <p className="mt-1 rounded-lg bg-brand-50 p-2 text-xs" dir="ltr">🧾 {r.receiptRef}</p>
+                  {r.receiptUrl && (
+                    <a href={r.receiptUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block">
+                      <img src={r.receiptUrl} alt="إيصال التحويل" className="max-h-56 w-full rounded-xl border border-brand-100 object-contain" />
+                      <span className="mt-1 block text-[11px] font-bold text-brand-700 underline">فتح صورة الإيصال بالحجم الكامل</span>
+                    </a>
+                  )}
                   {r.note && <p className="mt-1 text-xs text-gray-500">{r.note}</p>}
                   <div className="mt-3 flex gap-2">
                     <Button size="lg" variant="success" className="flex-1" onClick={() => decide(r.id, "APPROVE")} disabled={busy}>✓ موافقة</Button>
