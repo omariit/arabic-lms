@@ -27,12 +27,18 @@ export function OneClickLauncher({ youtubeConnected }: { youtubeConnected: boole
 
   const loadCourses = async () => {
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch("/api/admin/courses");
-      const data = await res.json();
-      setCourses(data.courses ?? []);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) throw new Error(data?.error ?? `تعذّر تحميل الدورات (${res.status})`);
+      setCourses(Array.isArray(data.courses) ? data.courses : []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذّر تحميل الدورات");
+    } finally {
       setLoaded(true);
-    } finally { setBusy(false); }
+      setBusy(false);
+    }
   };
 
   const startMeeting = async () => {
@@ -77,10 +83,18 @@ export function OneClickLauncher({ youtubeConnected }: { youtubeConnected: boole
         <h2 className="mb-1 text-lg font-extrabold text-red-700">🔴 الحصة المباشرة</h2>
         <p className="mb-3 text-xs text-red-900/60">حصة داخلية بالفيديو والصوت داخل المنصة — أو بث يوتيوب.</p>
 
-        {!loaded ? (
-          <Button size="lg" className="w-full" variant="outline" onClick={loadCourses} disabled={busy}>
-            {busy ? "…" : "عرض دوراتي"}
-          </Button>
+        {!loaded || (loaded && courses.length === 0) ? (
+          <div className="space-y-3">
+            <Button size="lg" className="w-full" variant="outline" onClick={loadCourses} disabled={busy}>
+              {busy ? "…" : "عرض دوراتي"}
+            </Button>
+            {loaded && courses.length === 0 && !error && (
+              <p className="text-center text-xs text-gray-500">
+                ما عندك دورات بعد — <Link href="/admin/courses" className="font-bold text-brand-600 underline">أنشئي دورة</Link> ثم افتحي حصة لها.
+              </p>
+            )}
+            {error && <p className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-600">{error}</p>}
+          </div>
         ) : !meeting && !yt ? (
           <div className="space-y-3">
             <div>

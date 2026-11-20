@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/primitives";
 import { uploadToR2 } from "@/lib/upload-client";
@@ -31,6 +31,9 @@ export function GradingClient() {
       setLoaded(true);
     } finally { setBusy(false); }
   };
+
+  // Load immediately: an empty admin screen that waits for a click reads as "broken".
+  useEffect(() => { void load(); }, []);
 
   const openItem = async (id: string) => {
     setOpenId(id);

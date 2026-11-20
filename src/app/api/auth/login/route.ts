@@ -7,19 +7,27 @@ import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
   const { ip, userAgent } = await clientMeta();
-  const rl = rateLimit(`login:${ip}`, 8, 60_000);
-  if (!rl.ok) {
-    await db.securityViolation.create({
-      data: { type: "RATE_LIMIT_ABUSE", detail: "login brute force", ipAddress: ip },
-    });
-    return rateLimitResponse(rl.retryAfter);
-  }
 
   const body = (await req.json().catch(() => ({}))) as {
     phone?: string; password?: string; countryCode?: string;
   };
   if (!body.phone || !body.password) {
     return NextResponse.json({ error: "يرجى إدخال رقم الهاتف وكلمة المرور" }, { status: 400 });
+  }
+
+  // Two buckets: per (IP + the number being tried) to stop brute-forcing one
+  // account, and a much looser per-IP ceiling. Keying only by IP used to lock out
+  // everyone behind the same network (a school, a family, a whole QA run).
+  const phoneKey = body.phone.replace(/[^0-9]/g, "").slice(-9);
+  const perAccount = rateLimit(`login:${ip}:${phoneKey}`, 8, 60_000);
+  if (!perAccount.ok) return rateLimitResponse(perAccount.retryAfter);
+
+  const perIp = rateLimit(`login-ip:${ip}`, 60, 60_000);
+  if (!perIp.ok) {
+    await db.securityViolation.create({
+      data: { type: "RATE_LIMIT_ABUSE", detail: "login brute force", ipAddress: ip },
+    });
+    return rateLimitResponse(perIp.retryAfter);
   }
 
   // The stored phone is normalized E.164; the user may type any familiar form

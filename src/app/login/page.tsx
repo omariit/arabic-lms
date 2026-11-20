@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [expired, setExpired] = useState(false);
+
+  // Arriving from a dead session (SessionGuard redirect or ?expired=1).
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.has("expired")) setExpired(true);
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +34,9 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "فشل تسجيل الدخول");
-      router.replace(data.redirect ?? "/dashboard");
+      const next = new URLSearchParams(window.location.search).get("next");
+      const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+      router.replace(safeNext ?? data.redirect ?? "/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطأ");
@@ -66,6 +75,11 @@ export default function LoginPage() {
               <Label htmlFor="password">كلمة المرور</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
+            {expired && !error && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+                انتهت جلستك أو تم الدخول من جهاز آخر. سجّلي الدخول من جديد — لا شيء ضاع.
+              </p>
+            )}
             {error && <p className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-600">{error}</p>}
             <Button type="submit" size="lg" className="w-full" disabled={loading}>
               {loading ? "جارٍ الدخول…" : "دخول"}

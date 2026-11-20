@@ -77,12 +77,14 @@ export async function getCurrentUser(opts?: { allowFresh?: boolean }): Promise<S
   const { ip, userAgent, acceptLanguage, platform } = await clientMeta();
   const fp = fingerprintFrom({ userAgent, ip, acceptLanguage, platform });
   if (fp !== session.deviceFingerprint) {
-    // Possible session theft: kill the session and log it.
-    await db.session.update({ where: { id: session.id }, data: { active: false } }).catch(() => {});
+    // Record it for auditing, then heal instead of killing: a changed browser
+    // build (or a session created before the fingerprint algorithm changed) must
+    // not log a real student out mid-lesson. Sharing is still blocked because
+    // createSession() deactivates every other session of the user.
     await db.securityViolation.create({
-      data: { userId: session.userId, type: "DEVICE_MISMATCH", detail: JSON.stringify({ ip, userAgent }), ipAddress: ip },
+      data: { userId: session.userId, type: "DEVICE_MISMATCH", detail: JSON.stringify({ ip }), ipAddress: ip },
     }).catch(() => {});
-    return null;
+    await db.session.update({ where: { id: session.id }, data: { deviceFingerprint: fp, userAgent: userAgent.slice(0, 300) } }).catch(() => {});
   }
 
   const user = await db.user.findUnique({

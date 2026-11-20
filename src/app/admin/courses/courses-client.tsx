@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, Input, Label, Badge } from "@/components/ui/primitives";
@@ -26,6 +26,9 @@ export function CoursesClient() {
       setLoaded(true);
     } finally { setBusy(false); }
   };
+
+  // Load immediately: an empty admin screen that waits for a click reads as "broken".
+  useEffect(() => { void load(); }, []);
 
   const create = async () => {
     setBusy(true);

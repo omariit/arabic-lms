@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent } from "@/components/ui/primitives";
 import { formatDateAr } from "@/lib/utils";
@@ -22,6 +22,9 @@ export function ViolationsClient() {
       setLoaded(true);
     } finally { setBusy(false); }
   };
+
+  // Load immediately: an empty admin screen that waits for a click reads as "broken".
+  useEffect(() => { void load(); }, []);
 
   if (!loaded) {
     return <Button size="lg" className="w-full" onClick={load} disabled={busy}>{busy ? "…" : "عرض السجل"}</Button>;

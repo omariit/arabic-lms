@@ -4,7 +4,7 @@
  * 2) Web Push: live-class alerts, chat messages, exam grading.
  * 3) Notification click: focus an open window or open the target URL.
  */
-const VERSION = "muqriah-v3";
+const VERSION = "muqriah-v4";
 const APP_SHELL = [
   "/",
   "/login",
@@ -32,38 +32,50 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+const PRIVATE_PREFIXES = ["/admin", "/dashboard", "/lesson", "/exam", "/live", "/api"];
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
 
-  // never cache API, sockets, or cross-origin
+  // never touch API, sockets, or cross-origin requests
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/socket.io")) return;
+
+  // Personal pages must never come from the cache: a stale shell showing a
+  // logged-in dashboard after the session ended is worse than a slow load.
+  if (PRIVATE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`))) {
+    event.respondWith(fetch(request).catch(() => caches.match("/offline")));
+    return;
+  }
 
   // static build assets: cache-first (immutable)
   if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icon") || /\.(png|svg|jpg|jpeg|webp|woff2)$/.test(url.pathname)) {
     event.respondWith(
       caches.match(request).then((hit) => hit || fetch(request).then((res) => {
-        const copy = res.clone();
-        caches.open(VERSION).then((c) => c.put(request, copy));
+        // Redirected/ opaque responses cannot be stored — caching them threw.
+        if (res.ok && res.type === "basic" && !res.redirected) {
+          const copy = res.clone();
+          caches.open(VERSION).then((c) => c.put(request, copy)).catch(() => {});
+        }
         return res;
       }))
     );
     return;
   }
 
-  // pages & everything else: network-first with offline fallback
+  // public pages: network-first with offline fallback
   event.respondWith(
     fetch(request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(VERSION).then((c) => c.put(request, copy));
+        if (res.ok && res.type === "basic" && !res.redirected) {
+          const copy = res.clone();
+          caches.open(VERSION).then((c) => c.put(request, copy)).catch(() => {});
+        }
         return res;
       })
-      .catch(() =>
-        caches.match(request).then((hit) => hit || caches.match("/offline"))
-      )
+      .catch(() => caches.match(request).then((hit) => hit || caches.match("/offline")))
   );
 });
 

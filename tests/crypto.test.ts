@@ -59,19 +59,27 @@ describe("encodeToken / decodeToken", () => {
 });
 
 describe("fingerprintFrom", () => {
-  const base = { userAgent: "UA", ip: "1.2.3.4", acceptLanguage: "ar", platform: "Android" };
+  const chromeWin =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+  const base = { userAgent: chromeWin, ip: "1.2.3.4", acceptLanguage: "ar", platform: "Android" };
 
   it("is deterministic for identical inputs", () => {
     expect(fingerprintFrom(base)).toBe(fingerprintFrom({ ...base }));
   });
 
-  it("changes when any component changes", () => {
-    expect(fingerprintFrom(base)).not.toBe(fingerprintFrom({ ...base, userAgent: "UA2" }));
-    expect(fingerprintFrom(base)).not.toBe(fingerprintFrom({ ...base, platform: "iOS" }));
-    expect(fingerprintFrom(base)).not.toBe(fingerprintFrom({ ...base, acceptLanguage: "en" }));
+  it("changes when the browser or OS family changes", () => {
+    const firefox = "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0";
+    expect(fingerprintFrom(base)).not.toBe(fingerprintFrom({ ...base, userAgent: firefox }));
   });
 
-  it("ignores the IP so mobile network switches do not log users out", () => {
+  it("ignores browser version bumps (Chromium UA reduction)", () => {
+    const newer = chromeWin.replace("131.", "132.");
+    expect(fingerprintFrom(base)).toBe(fingerprintFrom({ ...base, userAgent: newer }));
+  });
+
+  it("ignores language, platform hints and IP — none of them may end a session", () => {
+    expect(fingerprintFrom(base)).toBe(fingerprintFrom({ ...base, acceptLanguage: "en" }));
+    expect(fingerprintFrom(base)).toBe(fingerprintFrom({ ...base, platform: "iOS" }));
     expect(fingerprintFrom(base)).toBe(fingerprintFrom({ ...base, ip: "5.6.7.8" }));
   });
 

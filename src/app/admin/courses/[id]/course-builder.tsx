@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, Input, Label, Select, Badge, Textarea } from "@/components/ui/primitives";
@@ -62,16 +62,20 @@ export function CourseBuilder() {
   const [published, setPublished] = useState(false);
   const [hasCover, setHasCover] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [priceSaved, setPriceSaved] = useState(false);
   const [lessonForms, setLessonForms] = useState<Record<string, { title: string; youtubeId: string; access: string }>>({});
   const [editing, setEditing] = useState<Record<string, { title: string; youtubeId: string; access: string; description: string; scriptText: string; assignmentTitle: string; assignmentInstructions: string }>>({});
 
   const load = async () => {
     setBusy(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/admin/courses");
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) throw new Error(data?.error ?? `تعذّر تحميل المحتوى (${res.status})`);
       const course = (data.courses ?? []).find((c: { id: string }) => c.id === courseId) as (CourseInfo & { id: string }) | undefined;
+      if (!course) throw new Error("هذه الدورة غير موجودة أو ليست لك");
       setModules(course?.modules ?? []);
       setWeeklyMeetings(course?.weeklyMeetings ?? "");
       setBasePrice(Number(course?.price ?? 0));
@@ -81,11 +85,21 @@ export function CourseBuilder() {
       setPublished(Boolean(course?.published));
       setHasCover(Boolean(course?.coverImageKey));
       setLoaded(true);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "تعذّر تحميل المحتوى");
     } finally { setBusy(false); }
   };
 
+  // Open the builder ready to edit — no "click to load" dead screen.
+  useEffect(() => { void load(); }, []);
+
   if (!loaded) {
-    return <Button size="lg" className="w-full" onClick={load} disabled={busy}>{busy ? "…" : "تحميل المحتوى"}</Button>;
+    return (
+      <div className="space-y-2">
+        <Button size="lg" className="w-full" onClick={load} disabled={busy}>{busy ? "…" : "تحميل المحتوى"}</Button>
+        {loadError && <p className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-600">{loadError}</p>}
+      </div>
+    );
   }
 
   const run = async (fn: () => Promise<unknown>) => {

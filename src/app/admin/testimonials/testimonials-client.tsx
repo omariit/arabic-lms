@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, Input, Label, Select, Textarea } from "@/components/ui/primitives";
 
@@ -21,6 +21,9 @@ export function TestimonialsClient() {
       setLoaded(true);
     } finally { setBusy(false); }
   };
+
+  // Load immediately: an empty admin screen that waits for a click reads as "broken".
+  useEffect(() => { void load(); }, []);
 
   const create = async () => {
     setBusy(true);

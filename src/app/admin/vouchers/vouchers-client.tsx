@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, Select, Label } from "@/components/ui/primitives";
 
@@ -26,6 +26,9 @@ export function VouchersClient() {
       setLoaded(true);
     } finally { setBusy(false); }
   };
+
+  // Load immediately: an empty admin screen that waits for a click reads as "broken".
+  useEffect(() => { void load(); }, []);
 
   const generate = async () => {
     setBusy(true);

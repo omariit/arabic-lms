@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 /** Dynamic sitemap: landing, public pages, and published courses. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = [
+    { url: `${BASE}/courses`, changeFrequency: "weekly", priority: 0.9 },
     { url: BASE, changeFrequency: "weekly", priority: 1 },
     { url: `${BASE}/login`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${BASE}/register`, changeFrequency: "monthly", priority: 0.8 },

@@ -50,7 +50,10 @@ export async function middleware(req: NextRequest) {
     if (!session) {
       const url = req.nextUrl.clone();
       url.pathname = "/login";
-      url.search = `?next=${encodeURIComponent(pathname)}`;
+      // A cookie that is present but no longer valid = expired/revoked session:
+      // say so instead of showing a blank login form.
+      const expired = token ? "&expired=1" : "";
+      url.search = `?next=${encodeURIComponent(pathname)}${expired}`;
       if (pathname.startsWith("/api/")) {
         return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
       }

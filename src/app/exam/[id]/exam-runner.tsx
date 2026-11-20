@@ -109,7 +109,15 @@ export function ExamRunner({ examId, title, durationMin, maxGrade, courseTitle, 
   }
 
   if (phase === "error") {
-    return <p className="rounded-xl bg-red-50 p-4 text-center font-bold text-red-600">{error}</p>;
+    return (
+      <div className="space-y-3">
+        <p className="rounded-xl bg-red-50 p-4 text-center font-bold text-red-600">{error}</p>
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" onClick={start}>إعادة المحاولة</Button>
+          <a href="/dashboard"><Button variant="outline">لوحتي</Button></a>
+        </div>
+      </div>
+    );
   }
 
   if (phase === "done" && result) {
@@ -118,7 +126,9 @@ export function ExamRunner({ examId, title, durationMin, maxGrade, courseTitle, 
       <div className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle>نتيجتك: {result.score} / {maxGrade}</CardTitle>
+            <CardTitle>
+              نتيجتك: <span dir="ltr">{result.score} / {maxGrade}</span>
+            </CardTitle>
             <Progress value={pct} />
           </CardHeader>
           <CardContent>
@@ -156,8 +166,14 @@ export function ExamRunner({ examId, title, durationMin, maxGrade, courseTitle, 
   if (previousStatus === "SUBMITTED" || previousStatus === "GRADED") {
     return (
       <Card>
-        <CardContent className="text-center py-8">
+        <CardContent className="space-y-3 text-center py-8">
           <p className="font-bold text-emerald-700">أجبتِ هذا الاختبار مسبقًا ✓</p>
+          <p className="text-xs text-gray-500">
+            النتيجة محفوظة عند المعلمة وتظهر في لوحتك مع أي ملاحظات صوتية أو مكتوبة.
+          </p>
+          <div className="flex justify-center gap-2">
+            <a href="/dashboard"><Button variant="outline">عودة إلى لوحتي</Button></a>
+          </div>
         </CardContent>
       </Card>
     );

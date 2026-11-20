@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cairo, Tajawal } from "next/font/google";
 import { getLocale, dir } from "@/lib/i18n";
 import "./globals.css";
+import { SessionGuard } from "@/components/session-guard";
 
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
@@ -80,7 +81,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
   return (
     <html lang={locale} dir={dir(locale)} className={`${cairo.variable} ${tajawal.variable}`}>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        <SessionGuard />
+        {children}
+      </body>
     </html>
   );
 }

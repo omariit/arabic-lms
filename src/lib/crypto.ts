@@ -46,17 +46,46 @@ export function decodeToken<T = Record<string, unknown>>(token: string): T | nul
   }
 }
 
-/** Device fingerprint: SHA-256 of stable client characteristics + IP. */
+/**
+ * Device fingerprint: browser family + OS family only.
+ *
+ * Deliberately NOT built from `accept-language`, `sec-ch-ua-platform`, IP or full
+ * UA strings. Those change on their own (Chromium's UA reduction, a language
+ * switch, a mobile network hop, a browser update) and used to invalidate an
+ * otherwise-valid session — which surfaced as "suddenly every API returns 401".
+ * Single-device enforcement is handled by deactivating older sessions at login.
+ */
 export function fingerprintFrom(parts: {
   userAgent: string;
-  /** Kept for logging only — NOT part of the hash: mobile IPs rotate on every
-   * network switch (4G/Wi-Fi), which would silently log real users out. */
+  /** Kept for logging only; never part of the hash. */
   ip?: string;
   acceptLanguage?: string;
   platform?: string;
 }): string {
-  const raw = `${parts.userAgent}|${parts.acceptLanguage ?? ""}|${parts.platform ?? ""}`;
-  return createHash("sha256").update(raw).digest("hex");
+  const ua = (parts.userAgent || "").toLowerCase();
+  const browser = /edg\//.test(ua)
+    ? "edge"
+    : /opr\//.test(ua)
+      ? "opera"
+      : /chrome|crios/.test(ua)
+        ? "chrome"
+        : /firefox|fxios/.test(ua)
+          ? "firefox"
+          : /safari/.test(ua)
+            ? "safari"
+            : "other";
+  const os = /windows/.test(ua)
+    ? "windows"
+    : /android/.test(ua)
+      ? "android"
+      : /iphone|ipad|ipod/.test(ua)
+        ? "ios"
+        : /mac os x|macintosh/.test(ua)
+          ? "macos"
+          : /linux/.test(ua)
+            ? "linux"
+            : "other";
+  return createHash("sha256").update(`${browser}|${os}`).digest("hex");
 }
 
 export const SESSION_COOKIE = "lms_session";

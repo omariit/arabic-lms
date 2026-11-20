@@ -38,12 +38,19 @@ export async function uploadToR2(
     throw new UploadError(`حجم الملف أكبر من المسموح (${Math.round(presign.maxBytes / 1048576)} ميجا)`);
   }
 
-  const put = await fetch(presign.uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": presign.contentType ?? mimeType },
-    body: blob,
-  });
-  if (!put.ok) throw new UploadError("فشل رفع الملف إلى التخزين");
+  let put: Response;
+  try {
+    put = await fetch(presign.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": presign.contentType ?? mimeType },
+      body: blob,
+    });
+  } catch {
+    // Browser blocked the cross-origin PUT: storage CORS does not allow this
+    // origin, or the network dropped. Never surface a bare "Failed to fetch".
+    throw new UploadError("تعذّر الوصول إلى التخزين — تحقّقي من الاتصال ثم أعيدي المحاولة");
+  }
+  if (!put.ok) throw new UploadError(`فشل رفع الملف إلى التخزين (${put.status})`);
 
   return { key: presign.key, mimeType: presign.contentType ?? mimeType, size: blob.size };
 }

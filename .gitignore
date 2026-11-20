@@ -6,3 +6,9 @@ node_modules/
 *.log
 .DS_Store
 .env.local
+
+# QA artefacts (Playwright)
+qa-report/
+test-results/
+playwright-report/
+tests/e2e/.qa-state.json
