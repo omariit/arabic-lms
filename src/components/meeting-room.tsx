@@ -7,6 +7,7 @@ import { uploadToR2 } from "@/lib/upload-client";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { LiveSessionRecorder } from "@/lib/live-recorder";
 import { useIceServers } from "@/hooks/use-ice-servers";
+import { AttendanceCard, LivePollCard, PollResultsCard, type ActivePoll, type AttendanceData, type PollProgress } from "@/components/live-poll";
 
 /**
  * In-house video meeting (no external service).
@@ -102,6 +103,18 @@ export function MeetingRoom({
   const [liveRec, setLiveRec] = useState<{ state: string; sent: number; queued: number; recordingId?: string } | null>(null);
   const recorderRef = useRef<LiveSessionRecorder | null>(null);
   const [fileBusy, setFileBusy] = useState(false);
+
+  // ── in-lecture questions + attendance ──
+  const [poll, setPoll] = useState<ActivePoll | null>(null);
+  const [answered, setAnswered] = useState<{ optionIndex: number; correct: boolean | null } | null>(null);
+  const [progress, setProgress] = useState<PollProgress | null>(null);
+  const [attendance, setAttendance] = useState<AttendanceData | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState<string[]>(["", "", ""]);
+  const [correctIndex, setCorrectIndex] = useState<string>("");
+  const [durationSec, setDurationSec] = useState<string>("60");
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   const flash = useCallback((msg: string) => {
     setToast(msg);
@@ -209,6 +222,57 @@ export function MeetingRoom({
   }, []);
 
   // --- socket lifecycle ---
+  // ── in-lecture questions ──
+  const createPoll = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    const opts = pollOptions.map((o) => o.trim()).filter(Boolean);
+    if (question.trim().length < 3 || opts.length < 2) {
+      flash("اكتبي السؤال وأضيفي خيارين على الأقل");
+      return;
+    }
+    socket.emit("meet:poll-create", {
+      liveSessionId: liveId,
+      question,
+      options: opts,
+      correctIndex: correctIndex === "" ? null : Number(correctIndex),
+      durationSec: Number(durationSec),
+    });
+    setQuestion("");
+    setPollOptions(["", "", ""]);
+    setCorrectIndex("");
+  }, [correctIndex, durationSec, flash, liveId, pollOptions, question]);
+
+  const answerPoll = useCallback((optionIndex: number) => {
+    if (!poll) return;
+    socketRef.current?.emit("meet:poll-answer", { liveSessionId: liveId, pollId: poll.id, optionIndex });
+  }, [liveId, poll]);
+
+  const closePoll = useCallback(() => {
+    if (!poll) return;
+    socketRef.current?.emit("meet:poll-close", { liveSessionId: liveId, pollId: poll.id });
+  }, [liveId, poll]);
+
+  const refreshAttendance = useCallback(() => {
+    socketRef.current?.emit("meet:attendance", { liveSessionId: liveId });
+  }, [liveId]);
+
+  // Countdown: students watch it, the host closes the question when it ends.
+  useEffect(() => {
+    if (!poll || !poll.open || !poll.closeAt) {
+      setSecondsLeft(null);
+      return;
+    }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((new Date(poll.closeAt as string).getTime() - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left <= 0 && isHost) closePoll();
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [poll, isHost, closePoll]);
+
   useEffect(() => {
     const socket = io("/meet", {
       path: "/socket.io",
@@ -240,6 +304,7 @@ export function MeetingRoom({
     socket.on("meet:joined", (p: {
       self: { socketId: string; role: Role }; isHost: boolean; peers: string[]; roster: Participant[];
       maxSeats: number; inviteToken: string | null; waiting: Array<{ socketId: string; name: string }>;
+      poll?: ActivePoll | null; attendance?: AttendanceData | null;
     }) => {
       setStatus("in");
       setIsHost(p.isHost);
@@ -254,6 +319,11 @@ export function MeetingRoom({
         setMicAllowed(me.micAllowed);
         setCamAllowed(me.camAllowed);
       }
+      if (p.poll) {
+        setPoll(p.poll);
+        setAnswered(null);
+      }
+      if (p.attendance) setAttendance(p.attendance);
       // Offer to everyone already in the room.
       p.peers.forEach((peer) => ensurePeer(peer, true));
     });
@@ -343,6 +413,33 @@ export function MeetingRoom({
     socket.on("meet:knock", ({ name }: { name: string }) => flash(`🚪 ${name} تطلب الدخول`));
     socket.on("meet:spotlight", ({ socketId }: { socketId: string | null }) => setSpotlight(socketId));
     socket.on("meet:chat", (m: ChatItem) => setChat((c) => [...c, m]));
+
+    socket.on("meet:poll", (p: ActivePoll) => {
+      setPoll(p);
+      setAnswered(null);
+      setProgress(null);
+      setComposerOpen(false);
+      flash("❓ سؤال جديد من المعلمة");
+    });
+    socket.on("meet:poll-counts", ({ pollId, counts, total }: { pollId: string; counts: number[]; total: number }) => {
+      setPoll((cur) => (cur && cur.id === pollId ? { ...cur, counts } : cur));
+      setProgress((cur) => (cur && cur.id === pollId ? { ...cur, counts, total } : cur));
+    });
+    socket.on("meet:poll-ack", (a: { pollId: string; optionIndex?: number; correct?: boolean | null; correctIndex?: number | null; counts?: number[]; total?: number; error?: string }) => {
+      if (a.error) {
+        flash(a.error);
+        return;
+      }
+      setAnswered({ optionIndex: a.optionIndex ?? 0, correct: a.correct ?? null });
+      if (a.counts) setPoll((cur) => (cur && cur.id === a.pollId ? { ...cur, counts: a.counts! } : cur));
+    });
+    socket.on("meet:poll-closed", ({ pollId, correctIndex: ci, counts }: { pollId: string; correctIndex: number | null; counts: number[] }) => {
+      setPoll((cur) => (cur && cur.id === pollId ? { ...cur, open: false, status: "CLOSED", correctIndex: ci, counts } : cur));
+      setSecondsLeft(null);
+      flash("انتهى وقت السؤال");
+    });
+    socket.on("meet:poll-progress", (p: PollProgress) => setProgress(p));
+    socket.on("meet:attendance", (data: AttendanceData) => setAttendance(data));
 
     return () => {
       socket.emit("meet:leave", { liveSessionId: liveId });
@@ -686,6 +783,14 @@ export function MeetingRoom({
         ))}
       </div>
 
+
+      {poll && (
+        <div className="space-y-2">
+          <LivePollCard poll={poll} secondsLeft={secondsLeft} answered={answered} isHost={isHost} onAnswer={answerPoll} />
+          {isHost && <PollResultsCard poll={poll} progress={progress} onClose={closePoll} />}
+        </div>
+      )}
+
       {/* controls */}
       <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-brand-100 bg-white p-3">
         <Button variant={micOn ? "default" : "outline"} onClick={toggleMic} className="min-w-[110px]">
@@ -721,6 +826,13 @@ export function MeetingRoom({
         )}
         {isHost && (
           <>
+            <Button
+              variant={composerOpen ? "default" : "outline"}
+              data-testid="poll-open"
+              onClick={() => setComposerOpen((v) => !v)}
+            >
+              ❓ سؤال للحاضرات
+            </Button>
             <Button variant="outline" onClick={() => control("mute-all")}>🔇 إسكات الجميع</Button>
             <Button variant="outline" onClick={() => control("lock-room")}>🔒 قفل الغرفة</Button>
             <Button variant="destructive" onClick={() => { if (confirm("إنهاء الحصة لكل المشاركات؟")) control("end-meeting"); }}>
@@ -802,6 +914,86 @@ export function MeetingRoom({
             ))}
           </ul>
         </div>
+      )}
+
+
+      {isHost && composerOpen && (
+        <div data-testid="poll-composer" className="rounded-2xl border-2 border-brand-300 bg-white p-3">
+          <p className="mb-2 text-sm font-extrabold text-brand-950">❓ سؤال للحاضرات</p>
+          <textarea
+            data-testid="poll-question-input"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            rows={2}
+            placeholder="اكتبي نص السؤال… مثال: ما حكم الإظهار في {ن}؟"
+            className="w-full resize-y rounded-xl border border-brand-200 bg-brand-50/40 px-3 py-2 text-sm outline-none focus:border-brand-400"
+          />
+          <div className="mt-2 space-y-1.5">
+            {pollOptions.map((opt, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="w-5 shrink-0 text-center text-[11px] font-extrabold text-brand-700">{i + 1}</span>
+                <input
+                  data-testid="poll-option-input"
+                  value={opt}
+                  onChange={(e) => setPollOptions((cur) => cur.map((o, j) => (j === i ? e.target.value : o)))}
+                  placeholder={`الخيار ${i + 1}${i < 2 ? "" : " (اختياري)"}`}
+                  className="min-w-0 flex-1 rounded-xl border border-brand-200 bg-brand-50/40 px-3 py-2 text-xs outline-none focus:border-brand-400"
+                />
+              </div>
+            ))}
+            {pollOptions.length < 6 && (
+              <button type="button" onClick={() => setPollOptions((c) => [...c, ""])} className="text-[11px] font-bold text-brand-700 underline">
+                + خيار آخر
+              </button>
+            )}
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label className="text-[11px] font-bold text-brand-900/70">
+              الإجابة الصحيحة
+              <select
+                data-testid="poll-correct"
+                value={correctIndex}
+                onChange={(e) => setCorrectIndex(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-brand-200 bg-white px-2 py-2 text-xs"
+              >
+                <option value="">بدون تصحيح (رأي)</option>
+                {pollOptions.map((o, i) => (
+                  <option key={i} value={i}>{i + 1}. {o || `الخيار ${i + 1}`}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-[11px] font-bold text-brand-900/70">
+              وقت الإجابة
+              <select
+                data-testid="poll-duration"
+                value={durationSec}
+                onChange={(e) => setDurationSec(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-brand-200 bg-white px-2 py-2 text-xs"
+              >
+                <option value="0">حتى أُغلقها بنفسي</option>
+                <option value="15">١٥ ثانية</option>
+                <option value="30">٣٠ ثانية</option>
+                <option value="45">٤٥ ثانية</option>
+                <option value="60">دقيقة</option>
+                <option value="90">دقيقة ونصف</option>
+                <option value="120">دقيقتان</option>
+                <option value="180">٣ دقائق</option>
+                <option value="300">٥ دقائق</option>
+              </select>
+            </label>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button data-testid="poll-send" onClick={createPoll} disabled={Boolean(poll && poll.open)}>
+              إرسال السؤال للحاضرات
+            </Button>
+            <Button variant="outline" onClick={() => setComposerOpen(false)}>إلغاء</Button>
+            {poll && poll.open && <span className="self-center text-[11px] font-bold text-amber-700">أغلقي السؤال الحالي أولًا</span>}
+          </div>
+        </div>
+      )}
+
+      {isHost && (
+        <AttendanceCard data={attendance} onRefresh={refreshAttendance} liveId={liveId} />
       )}
 
       {/* chat */}

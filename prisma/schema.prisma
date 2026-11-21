@@ -26,14 +26,14 @@ enum ViolationType {
 }
 
 model User {
-  id           String        @id @default(cuid())
+  id           String   @id @default(cuid())
   fullName     String
-  phone        String        @unique // normalized E.164 (+9627...); used for login + watermark identity
-  countryCode  String        @default("JO") // ISO 3166 alpha-2; drives pricing + currency display
+  phone        String   @unique // normalized E.164 (+9627...); used for login + watermark identity
+  countryCode  String   @default("JO") // ISO 3166 alpha-2; drives pricing + currency display
   passwordHash String
-  role         Role          @default(STUDENT)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  role         Role     @default(STUDENT)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   sessions           Session[]
   enrollments        Enrollment[]
@@ -46,7 +46,7 @@ model User {
   conversations      Conversation[]
   pushSubscriptions  PushSubscription[]
   lessonThreads      LessonThread[]
-  recordings         RecordingSession[] @relation("RecordingTeacher")
+  recordings         RecordingSession[]  @relation("RecordingTeacher")
 
   @@index([role])
 }
@@ -56,7 +56,7 @@ model User {
 // Singleton row (id = "landing") holding section visibility + editable texts for AR/EN.
 model SiteContent {
   id        String   @id @default("landing")
-  data      Json     // { sections: {key: bool}, texts: { ar: {key: string|list}, en: {...} } }
+  data      Json // { sections: {key: bool}, texts: { ar: {key: string|list}, en: {...} } }
   updatedAt DateTime @updatedAt
 }
 
@@ -85,7 +85,7 @@ model Conversation {
   lastMessageAt DateTime @default(now())
   staffUnread   Int      @default(0) // messages from student not yet read by staff
   studentUnread Int      @default(0) // messages from staff not yet read by student
-  assignedToId  String?  // staff member currently handling this conversation
+  assignedToId  String? // staff member currently handling this conversation
   createdAt     DateTime @default(now())
 
   student  User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -145,17 +145,17 @@ model SecurityViolation {
 // ---------- Single-teacher identity & YouTube OAuth ----------
 
 model TeacherProfile {
-  id           String   @id @default(cuid())
-  displayName  String
-  title        String   @default("المعلمة") // e.g. "معلمة الرياضيات"
-  bio          String   @db.Text
-  methodology  String   @db.Text // teaching methodology
-  achievements String   @db.Text // newline-separated achievements
-  photoUrl     String?
-  cliqAlias    String? // CliQ/bank transfer alias for enrollment receipts
-  bankHint     String?
+  id             String   @id @default(cuid())
+  displayName    String
+  title          String   @default("المعلمة") // e.g. "معلمة الرياضيات"
+  bio            String   @db.Text
+  methodology    String   @db.Text // teaching methodology
+  achievements   String   @db.Text // newline-separated achievements
+  photoUrl       String?
+  cliqAlias      String? // CliQ/bank transfer alias for enrollment receipts
+  bankHint       String?
   whatsappNumber String? // normalized wa.me digits (no +/00) for the public "تواصل مع الإدارة" button
-  updatedAt    DateTime @updatedAt
+  updatedAt      DateTime @updatedAt
 }
 
 model TeacherOAuthToken {
@@ -171,35 +171,35 @@ model TeacherOAuthToken {
 // ---------- Curriculum ----------
 
 model Course {
-  id          String     @id @default(cuid())
-  title       String
-  description String     @db.Text
-  price       Int        @default(0) // DEFAULT monthly price; 0 = free; overridden per country via CoursePrice
-  level       String     @default("عام")
-  published   Boolean    @default(false)
-  coverColor  String     @default("#1d5fe0")
+  id            String   @id @default(cuid())
+  title         String
+  description   String   @db.Text
+  price         Int      @default(0) // DEFAULT monthly price; 0 = free; overridden per country via CoursePrice
+  level         String   @default("عام")
+  published     Boolean  @default(false)
+  coverColor    String   @default("#1d5fe0")
   coverImageKey String? // uploaded cover image (private R2 object)
-  outcomes    String     @db.Text @default("") // "ستتعلّمين" bullet list, one per line
-  requirements String    @db.Text @default("") // prerequisites, one per line
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  outcomes      String   @default("") @db.Text // "ستتعلّمين" bullet list, one per line
+  requirements  String   @default("") @db.Text // prerequisites, one per line
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  modules           Module[]
-  enrollments       Enrollment[]
+  modules            Module[]
+  enrollments        Enrollment[]
   enrollmentRequests EnrollmentRequest[]
-  exams             Exam[]
-  liveSessions      LiveSession[]
-  vouchers          Voucher[]
-  prices            CoursePrice[]
-  weeklyMeetings    String        @db.Text @default("") // multiline, e.g. "الثلاثاء 6:00 م"
-  recordings        RecordingSession[]
+  exams              Exam[]
+  liveSessions       LiveSession[]
+  vouchers           Voucher[]
+  prices             CoursePrice[]
+  weeklyMeetings     String              @default("") @db.Text // multiline, e.g. "الثلاثاء 6:00 م"
+  recordings         RecordingSession[]
 
   @@index([published])
 }
 
 // Per-country monthly price overrides (e.g. cheaper for Jordan, USD for USA)
 model CoursePrice {
-  id          String @id @default(cuid())
+  id          String   @id @default(cuid())
   courseId    String
   countryCode String // ISO 3166 alpha-2
   price       Int
@@ -229,21 +229,21 @@ enum LessonAccess {
 }
 
 model Lesson {
-  id        String      @id @default(cuid())
-  moduleId  String
-  title     String
-  access    LessonAccess @default(ENROLLED)
-  youtubeId String // stored server-side; never exposed raw to clients
-  duration  Int         @default(0) // seconds
-  position  Int         @default(0)
-  description String   @db.Text @default("") // lesson content shown under the video
-  scriptText  String   @db.Text @default("") // lesson script/transcript
-  assignmentTitle String?
-  assignmentInstructions String @db.Text @default("") // empty = no assignment
-  audioKey   String? // teacher's own recording of the lesson (private R2 object)
+  id                     String       @id @default(cuid())
+  moduleId               String
+  title                  String
+  access                 LessonAccess @default(ENROLLED)
+  youtubeId              String // stored server-side; never exposed raw to clients
+  duration               Int          @default(0) // seconds
+  position               Int          @default(0)
+  description            String       @default("") @db.Text // lesson content shown under the video
+  scriptText             String       @default("") @db.Text // lesson script/transcript
+  assignmentTitle        String?
+  assignmentInstructions String       @default("") @db.Text // empty = no assignment
+  audioKey               String? // teacher's own recording of the lesson (private R2 object)
 
-  module  Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  threads LessonThread[]
+  module    Module            @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  threads   LessonThread[]
   resources LessonResource[]
   recording RecordingSession?
 
@@ -288,14 +288,14 @@ model LessonThread {
 }
 
 model LessonMessage {
-  id        String   @id @default(cuid())
-  threadId  String
-  senderId  String
+  id         String   @id @default(cuid())
+  threadId   String
+  senderId   String
   senderRole Role
-  body      String   @db.Text
-  audioKey  String?  // optional voice note (R2 object key)
-  audioMime String?
-  createdAt DateTime @default(now())
+  body       String   @db.Text
+  audioKey   String? // optional voice note (R2 object key)
+  audioMime  String?
+  createdAt  DateTime @default(now())
 
   thread LessonThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
@@ -343,8 +343,8 @@ model EnrollmentRequest {
   decidedAt  DateTime?
   createdAt  DateTime      @default(now())
 
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([userId])
@@ -352,14 +352,14 @@ model EnrollmentRequest {
 }
 
 model Voucher {
-  id         String     @id @default(cuid())
-  code       String     @unique
-  courseId   String
-  createdBy  String // teacher id
-  usedById   String?
-  usedAt     DateTime?
-  expired    Boolean    @default(false)
-  createdAt  DateTime   @default(now())
+  id        String    @id @default(cuid())
+  code      String    @unique
+  courseId  String
+  createdBy String // teacher id
+  usedById  String?
+  usedAt    DateTime?
+  expired   Boolean   @default(false)
+  createdAt DateTime  @default(now())
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user   User?  @relation(fields: [usedById], references: [id], onDelete: SetNull)
@@ -375,19 +375,19 @@ enum ExamType {
 }
 
 model Exam {
-  id          String   @id @default(cuid())
-  courseId    String
-  title       String
-  type        ExamType @default(MCQ)
-  durationMin Int      @default(15) // countdown for MCQ; max duration for VOICE
-  maxGrade    Int      @default(100)
-  published   Boolean  @default(false)
+  id               String   @id @default(cuid())
+  courseId         String
+  title            String
+  type             ExamType @default(MCQ)
+  durationMin      Int      @default(15) // countdown for MCQ; max duration for VOICE
+  maxGrade         Int      @default(100)
+  published        Boolean  @default(false)
   // Randomisation requested by the teacher: a different order for every student,
   // while the stored order keeps grading and review consistent.
-  shuffleQuestions Boolean @default(false)
-  shuffleOptions   Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  shuffleQuestions Boolean  @default(false)
+  shuffleOptions   Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   course    Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
   questions Question[]
@@ -422,23 +422,23 @@ enum AttemptStatus {
 }
 
 model ExamAttempt {
-  id         String        @id @default(cuid())
-  userId     String
-  examId     String
-  status     AttemptStatus @default(IN_PROGRESS)
-  answers    Json? // questionId -> ORIGINAL option index (MCQ)
+  id               String        @id @default(cuid())
+  userId           String
+  examId           String
+  status           AttemptStatus @default(IN_PROGRESS)
+  answers          Json? // questionId -> ORIGINAL option index (MCQ)
   // The exact order shown to this student: { q: [questionId…], o: { questionId: [optionIndex…] } }
-  questionOrder Json?
-  autoScore  Int? // auto-graded score (MCQ)
-  manualGrade Int? // teacher grade (VOICE + override)
-  feedbackText String? // teacher text notes
+  questionOrder    Json?
+  autoScore        Int? // auto-graded score (MCQ)
+  manualGrade      Int? // teacher grade (VOICE + override)
+  feedbackText     String? // teacher text notes
   feedbackAudioKey String? // teacher voice feedback (R2 object key)
-  startedAt  DateTime      @default(now())
-  submittedAt DateTime?
+  startedAt        DateTime      @default(now())
+  submittedAt      DateTime?
 
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exam          Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
-  audioFiles    AudioSubmission[]
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam       Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
+  audioFiles AudioSubmission[]
 
   @@unique([userId, examId])
   @@index([status])
@@ -476,25 +476,65 @@ enum RoomMode {
 }
 
 model LiveSession {
-  id            String     @id @default(cuid())
-  courseId      String
-  title         String
-  scheduledAt   DateTime?
+  id             String     @id @default(cuid())
+  courseId       String
+  title          String
+  scheduledAt    DateTime?
   youtubeVideoId String? // captured automatically by the one-click launcher
-  mode          RoomMode   @default(CLASSROOM)
-  status        LiveStatus @default(SCHEDULED)
-  inviteToken   String?    @unique // public invite link token for non-registered guests
-  guestAllowed  Boolean    @default(true)
-  maxSeats      Int        @default(12) // mesh capacity guard (client CPU bound)
-  startedAt     DateTime?
-  endedAt       DateTime?
-  createdAt     DateTime   @default(now())
+  mode           RoomMode   @default(CLASSROOM)
+  status         LiveStatus @default(SCHEDULED)
+  inviteToken    String?    @unique // public invite link token for non-registered guests
+  guestAllowed   Boolean    @default(true)
+  maxSeats       Int        @default(12) // mesh capacity guard (client CPU bound)
+  startedAt      DateTime?
+  endedAt        DateTime?
+  createdAt      DateTime   @default(now())
 
-  course      Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course         Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
   attendanceLogs AttendanceLog[]
   chatMessages   LiveMessage[]
+  polls          LivePoll[]
 
   @@index([courseId, status])
+}
+
+/// A question the teacher asks during the live lecture.
+model LivePoll {
+  id            String     @id @default(cuid())
+  liveSessionId String
+  question      String     @db.Text
+  options       Json // string[] (2..6)
+  correctIndex  Int? // null = opinion poll (no right answer)
+  status        PollStatus @default(OPEN)
+  closeAt       DateTime? // null = the teacher closes it manually
+  createdAt     DateTime   @default(now())
+  closedAt      DateTime?
+
+  liveSession LiveSession      @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
+  answers     LivePollAnswer[]
+
+  @@index([liveSessionId, createdAt])
+}
+
+/// One answer per participant; guests have no account so the socket id identifies them.
+model LivePollAnswer {
+  id            String   @id @default(cuid())
+  pollId        String
+  userId        String?
+  guestSocketId String?
+  guestName     String?
+  optionIndex   Int
+  createdAt     DateTime @default(now())
+
+  poll LivePoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@index([pollId])
+  @@index([userId])
+}
+
+enum PollStatus {
+  OPEN
+  CLOSED
 }
 
 /// In-meeting chat (text and voice notes), visible to the room only.
@@ -503,7 +543,7 @@ model LiveMessage {
   liveSessionId String
   authorName    String
   authorRole    Role? // null = invited guest
-  body          String   @db.Text @default("")
+  body          String   @default("") @db.Text
   audioKey      String?
   audioMime     String?
   // Shared material during the broadcast: an image, a PDF, a document or audio.
@@ -518,10 +558,10 @@ model LiveMessage {
 }
 
 model AttendanceLog {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   liveSessionId String
   userId        String
-  joinedAt      DateTime @default(now())
+  joinedAt      DateTime  @default(now())
   leftAt        DateTime?
 
   liveSession LiveSession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)

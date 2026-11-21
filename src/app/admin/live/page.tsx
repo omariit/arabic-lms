@@ -37,6 +37,7 @@ export default async function AdminLivePage() {
                     {l.status === "LIVE" ? "مباشر" : l.status === "ENDED" ? "منتهية" : "مجدولة"}
                   </Badge>
                   <Badge tone="brand">{l.attendanceLogs.length} حاضرة</Badge>
+                  <Link href={`/admin/live/${l.id}/report`} className={cn(buttonVariants({ size: "sm", variant: "outline" }))}>تقرير</Link>
                   <Link href={`/live/${l.id}`} className={cn(buttonVariants({ size: "sm", variant: "secondary" }))}>دخول</Link>
                 </div>
               </CardContent>

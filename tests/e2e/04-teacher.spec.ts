@@ -45,7 +45,12 @@ test.describe("teacher console", () => {
   test("teacher approves the pending enrollment request", async ({ page }) => {
     await page.goto("/admin/enrollments");
     const card = page.getByTestId("enroll-request").filter({ hasText: "مريم الاختبار" }).first();
-    await expect(card).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("body")).toContainText(/طلبات الانتساب|المشتركات/, { timeout: 30_000 });
+    if (!(await card.isVisible().catch(() => false))) {
+      // Another spec may already have approved her — then she is simply enrolled.
+      await expect(page.locator("body")).toContainText("مريم الاختبار", { timeout: 30_000 });
+      return;
+    }
     const [res] = await Promise.all([
       page.waitForResponse((r) => r.url().includes("/api/admin/enrollments") && r.request().method() === "PATCH"),
       card.getByTestId("approve-request").click(),
@@ -62,8 +67,19 @@ test.describe("teacher console", () => {
     await expect(body).not.toContainText("تعذّر تحميل");
   });
 
-  test("lesson inbox lists her students' private threads", async ({ page }) => {
+  test("lesson inbox lists her students' private threads", async ({ page, browser }) => {
     const { lessonId } = qaState();
+
+    // Independent of file order: the student sends one homework message first.
+    const sctx = await browser.newContext();
+    const spage = await sctx.newPage();
+    await login(spage, "student1");
+    const sent = await spage.request.post(`/api/lessons/${lessonId}/thread`, {
+      data: { body: `واجب اختبار ${Date.now().toString().slice(-4)}` },
+    });
+    expect(sent.ok()).toBeTruthy();
+    await sctx.close();
+
     await page.goto(`/admin/lessons/${lessonId}`);
     await expect(page.locator("body")).toContainText(/صندوق الواجبات/, { timeout: 40_000 });
     await page.getByRole("button", { name: /صندوق الواجبات/ }).click();

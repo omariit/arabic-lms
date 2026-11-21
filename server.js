@@ -29,6 +29,72 @@ function liveFileKeyAllowed(key, { userId, liveSessionId }) {
   return parts[2] === liveSessionId || (Boolean(userId) && parts[2] === userId);
 }
 
+/**
+ * "Is this question still open?" — keep in sync with `src/lib/live-poll.ts`.
+ * A poll ends when the teacher closes it or when its countdown runs out.
+ */
+function pollOpen(poll, now = Date.now()) {
+  if (!poll || poll.status !== "OPEN" || poll.closedAt) return false;
+  if (!poll.closeAt) return true;
+  return new Date(poll.closeAt).getTime() > now;
+}
+
+function pollPayload(poll, reveal = false) {
+  const open = pollOpen(poll);
+  const options = Array.isArray(poll.options) ? poll.options : [];
+  return {
+    id: poll.id,
+    question: poll.question,
+    options,
+    status: poll.status,
+    closeAt: poll.closeAt,
+    createdAt: poll.createdAt,
+    counts: options.map(() => 0),
+    correctIndex: open && !reveal ? null : (poll.correctIndex ?? null),
+    open,
+  };
+}
+
+/** Counts + who answered / who is still missing — the host's live picture. */
+async function pollState(pollId) {
+  const poll = await db.livePoll.findUnique({
+    where: { id: pollId },
+    include: {
+      answers: true,
+      liveSession: { include: { course: { include: { enrollments: { include: { user: true } } } } } },
+    },
+  });
+  if (!poll) return null;
+  const options = Array.isArray(poll.options) ? poll.options : [];
+  const counts = options.map(() => 0);
+  const answered = [];
+  const missing = [];
+  const seen = new Set();
+  for (const a of poll.answers) {
+    const key = a.userId ? "u:" + a.userId : "g:" + (a.guestSocketId || a.guestName);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (a.optionIndex >= 0 && a.optionIndex < counts.length) counts[a.optionIndex] += 1;
+    const name = a.userId
+      ? ((poll.liveSession.course.enrollments.find((e) => e.userId === a.userId) || {}).user || {}).fullName || "طالبة"
+      : a.guestName || "ضيفة";
+    answered.push({ name, optionIndex: a.optionIndex, userId: a.userId || null, guest: !a.userId });
+  }
+  for (const e of poll.liveSession.course.enrollments) {
+    if (e.user.role !== "STUDENT") continue;
+    if (!poll.answers.some((a) => a.userId === e.userId)) missing.push({ userId: e.userId, name: e.user.fullName });
+  }
+  return {
+    poll,
+    counts,
+    total: counts.reduce((x, y) => x + y, 0),
+    answered,
+    missing,
+    correctCount:
+      poll.correctIndex === null || poll.correctIndex === undefined ? null : counts[poll.correctIndex] || 0,
+  };
+}
+
 const port = parseInt(process.env.PORT || "3000", 10);
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
@@ -119,6 +185,44 @@ async function main() {
       count: room.participants.size,
       maxSeats: room.maxSeats,
     });
+  }
+
+  async function missingNames(liveSessionId) {
+    const live = await db.liveSession.findUnique({
+      where: { id: liveSessionId },
+      include: { course: { include: { enrollments: { include: { user: true } } } } },
+    });
+    return (live ? live.course.enrollments : [])
+      .filter((e) => e.user.role === "STUDENT")
+      .map((e) => ({ userId: e.userId, name: e.user.fullName }));
+  }
+
+  async function attendanceOf(liveSessionId) {
+    const rows = await db.attendanceLog.findMany({
+      where: { liveSessionId },
+      include: { user: { select: { fullName: true, role: true } } },
+      orderBy: { joinedAt: "asc" },
+    });
+    const live = await db.liveSession.findUnique({ where: { id: liveSessionId } });
+    const roster = live
+      ? await db.enrollment.findMany({
+          where: { courseId: live.courseId, user: { role: "STUDENT" } },
+          select: { userId: true, user: { select: { fullName: true } } },
+        })
+      : [];
+    const present = new Set(rows.map((r) => r.userId));
+    return {
+      rows: rows.map((r) => ({
+        id: r.id,
+        userId: r.userId,
+        name: r.user.fullName,
+        joinedAt: r.joinedAt,
+        leftAt: r.leftAt,
+        seconds: Math.max(0, Math.round(((r.leftAt ? new Date(r.leftAt).getTime() : Date.now()) - new Date(r.joinedAt).getTime()) / 1000)),
+      })),
+      missing: roster.filter((e) => !present.has(e.userId)).map((e) => ({ userId: e.userId, name: e.user.fullName })),
+      enrolled: roster.length,
+    };
   }
 
   async function loadRoom(liveSessionId) {
@@ -261,6 +365,8 @@ async function main() {
         maxSeats: room.maxSeats,
         inviteToken: isHost ? room.inviteToken : null,
         waiting: isHost ? [...room.waiting.values()] : [],
+        poll: room.activePoll || null,
+        attendance: isHost ? room.attendance || null : undefined,
       });
       socket.to(liveSessionId).emit("meet:peer-joined", {
         socketId: socket.id,
@@ -406,6 +512,136 @@ async function main() {
     });
 
     // --- In-room chat (text + voice note) ---
+    // ── in-lecture questions ────────────────────────────────────────────────
+    socket.on("meet:poll-create", async ({ liveSessionId, question, options, correctIndex, durationSec }) => {
+      const room = rooms.get(liveSessionId);
+      if (!room || room.hostSocketId !== socket.id) {
+        return socket.emit("meet:error", { message: "إنشاء السؤال من صلاحية المعلمة" });
+      }
+      if (room.activePoll && pollOpen(room.activePoll)) {
+        return socket.emit("meet:error", { message: "أغلقي السؤال الحالي أولًا" });
+      }
+      const text = String(question || "").trim().slice(0, 500);
+      const opts = (Array.isArray(options) ? options : [])
+        .map((o) => String(o || "").trim().slice(0, 200))
+        .filter(Boolean)
+        .slice(0, 6);
+      if (text.length < 3 || opts.length < 2) {
+        return socket.emit("meet:error", { message: "اكتبي السؤال وأضيفي خيارين على الأقل" });
+      }
+      let ci = null;
+      if (correctIndex !== null && correctIndex !== undefined && correctIndex !== "" && Number.isFinite(Number(correctIndex))) {
+        const n = Number(correctIndex);
+        if (n < 0 || n >= opts.length) return socket.emit("meet:error", { message: "الإجابة الصحيحة غير مطابقة للخيارات" });
+        ci = n;
+      }
+      const allowed = [0, 15, 30, 45, 60, 90, 120, 180, 300];
+      const secs = allowed.includes(Number(durationSec)) ? Number(durationSec) : 0;
+      try {
+        const created = await db.livePoll.create({
+          data: {
+            liveSessionId,
+            question: text,
+            options: opts,
+            correctIndex: ci,
+            closeAt: secs > 0 ? new Date(Date.now() + secs * 1000) : null,
+          },
+        });
+        const payload = pollPayload(created);
+        room.activePoll = payload;
+        meet.to(liveSessionId).emit("meet:poll", payload);
+        if (room.hostSocketId) {
+          meet.to(room.hostSocketId).emit("meet:poll-progress", {
+            id: created.id, counts: payload.counts, total: 0, answered: [],
+            missing: await missingNames(liveSessionId),
+          });
+        }
+      } catch (e) {
+        socket.emit("meet:error", { message: "تعذّر إنشاء السؤال — أعيدي المحاولة" });
+      }
+    });
+
+    socket.on("meet:poll-answer", async ({ liveSessionId, pollId, optionIndex }) => {
+      const room = rooms.get(liveSessionId);
+      const p = room && room.participants.get(socket.id);
+      if (!room || !p) return;
+      const poll = await db.livePoll.findUnique({ where: { id: pollId } });
+      if (!poll || poll.liveSessionId !== liveSessionId) return;
+      if (!pollOpen(poll)) {
+        return socket.emit("meet:poll-ack", { pollId, error: "انتهى وقت الإجابة على هذا السؤال" });
+      }
+      const opts = Array.isArray(poll.options) ? poll.options : [];
+      const idx = Number(optionIndex);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= opts.length) return;
+      try {
+        const already = await db.livePollAnswer.findFirst({
+          where: { pollId, OR: [isGuest ? { guestSocketId: socket.id } : { userId: user.id }] },
+        });
+        if (already) {
+          return socket.emit("meet:poll-ack", { pollId, error: "أجبتِ على هذا السؤال بالفعل", optionIndex: already.optionIndex });
+        }
+        await db.livePollAnswer.create({
+          data: {
+            pollId,
+            userId: isGuest ? null : user.id,
+            guestSocketId: isGuest ? socket.id : null,
+            guestName: isGuest ? p.name : null,
+            optionIndex: idx,
+          },
+        });
+        const state = await pollState(pollId);
+        socket.emit("meet:poll-ack", {
+          pollId,
+          optionIndex: idx,
+          correct: poll.correctIndex === null || poll.correctIndex === undefined ? null : poll.correctIndex === idx,
+          correctIndex: poll.correctIndex == null ? null : poll.correctIndex,
+          counts: state.counts,
+          total: state.total,
+        });
+        meet.to(liveSessionId).emit("meet:poll-counts", { pollId, counts: state.counts, total: state.total });
+        if (room.hostSocketId) {
+          meet.to(room.hostSocketId).emit("meet:poll-progress", {
+            id: pollId, counts: state.counts, total: state.total, answered: state.answered, missing: state.missing,
+          });
+        }
+      } catch (e) {
+        socket.emit("meet:poll-ack", { pollId, error: "تعذّر تسجيل الإجابة — أعيدي المحاولة" });
+      }
+    });
+
+    socket.on("meet:poll-close", async ({ liveSessionId, pollId }) => {
+      const room = rooms.get(liveSessionId);
+      if (!room || room.hostSocketId !== socket.id) return;
+      const poll = await db.livePoll.findUnique({ where: { id: pollId } });
+      if (!poll || poll.liveSessionId !== liveSessionId) return;
+      await db.livePoll
+        .update({ where: { id: pollId }, data: { status: "CLOSED", closedAt: poll.closedAt || new Date() } })
+        .catch(() => {});
+      const state = await pollState(pollId);
+      if (room.activePoll && room.activePoll.id === pollId) room.activePoll = null;
+      meet.to(liveSessionId).emit("meet:poll-closed", {
+        pollId,
+        correctIndex: poll.correctIndex == null ? null : poll.correctIndex,
+        counts: state.counts,
+        total: state.total,
+      });
+      if (room.hostSocketId) {
+        meet.to(room.hostSocketId).emit("meet:poll-progress", {
+          id: pollId, counts: state.counts, total: state.total, answered: state.answered,
+          missing: state.missing, closed: true,
+        });
+      }
+    });
+
+    // ── attendance on demand (the host panel refreshes it) ──────────────────
+    socket.on("meet:attendance", async ({ liveSessionId }) => {
+      const room = rooms.get(liveSessionId);
+      if (!room || room.hostSocketId !== socket.id) return;
+      const data = await attendanceOf(liveSessionId);
+      room.attendance = data;
+      socket.emit("meet:attendance", data);
+    });
+
     socket.on("meet:chat", async ({ liveSessionId, body, audioKey, audioMime, fileKey, fileMime, fileName }) => {
       const room = rooms.get(liveSessionId);
       const p = room?.participants.get(socket.id);
@@ -459,6 +695,21 @@ async function main() {
     const room = rooms.get(liveSessionId);
     if (!room) return;
     const wasHost = room.hostSocketId === socketId;
+    const leaving = room.participants.get(socketId);
+    if (leaving && leaving.userId && leaving.role === "STUDENT") {
+      // Close the attendance record: the teacher's report needs the real duration.
+      db.attendanceLog
+        .findFirst({ where: { liveSessionId, userId: leaving.userId, leftAt: null }, orderBy: { joinedAt: "desc" } })
+        .then((log) => log && db.attendanceLog.update({ where: { id: log.id }, data: { leftAt: new Date() } }))
+        .catch(() => {});
+    }
+    if (wasHost && room.activePoll) {
+      // Never leave a question hanging when the teacher drops out.
+      db.livePoll
+        .updateMany({ where: { liveSessionId, status: "OPEN" }, data: { status: "CLOSED", closedAt: new Date() } })
+        .catch(() => {});
+      room.activePoll = null;
+    }
     room.waiting.delete(socketId);
     room.participants.delete(socketId);
 
