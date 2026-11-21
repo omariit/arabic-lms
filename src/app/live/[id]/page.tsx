@@ -106,6 +106,8 @@ export default async function LiveClassroomPage({
             isGuest: false,
           }}
           initialChat={[]}
+          courseId={live.course.id}
+          recordingServiceUrl={process.env.NEXT_PUBLIC_RECORDING_SERVICE_URL ?? ""}
         />
       </main>
     );

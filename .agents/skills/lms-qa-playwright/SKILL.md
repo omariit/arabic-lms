@@ -58,6 +58,9 @@ QA accounts (staging): `+962790000001` admin, `…0002` teacher, `…0003` assis
 | login fails "still at /login" | cold start + client redirect race; 429 after many attempts | helper navigates explicitly after 200 and backs off on 429 |
 | studio test says "الدرس عنده تسجيل بالفعل" | one recording per lesson | every studio spec first deletes recordings of its course |
 | audit shows tiny/overlapping nav labels | too many items in one row | staff nav = 4 primary + «المزيد» sheet; `scripts/ux-audit.mjs` guards it |
+| "already answered / already has a recording" on re-run | specs share one account | create a throw-away exam/lesson inside the spec and delete it at the end |
+| an earlier spec changed a password | 04 sets a student password | 04 restores the QA password; 11 resets it before signing in |
+| hidden `<input type=file>` "not visible" | file inputs are display:none by design | assert `toHaveCount(1)` and use `setInputFiles` |
 | account looks "broken" after repeated tries | the limiter used to count *attempts* | now counts failures only and resets on success (`tests/login-rate-limit.test.ts`) |
 | `tls_get_more_records` on video | Railway edge drops a connection when a media stream is aborted | `getWithRetry` |
 | empty admin screen in a test | the screen genuinely did not auto-load (bug, not flake) | keep the assertion; fix the component |

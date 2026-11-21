@@ -23,7 +23,10 @@ export function StaffManager() {
   const [busy, setBusy] = useState(false);
 
   const load = () =>
-    fetch("/api/admin/staff").then((r) => r.json()).then((j) => setAssistants(j.assistants ?? []));
+    fetch("/api/admin/staff", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setAssistants(j?.assistants ?? []))
+      .catch(() => setAssistants([]));
 
   useEffect(() => { load(); }, []);
 
@@ -36,11 +39,13 @@ export function StaffManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fullName: name, phone, countryCode: country }),
       });
-      const j = await res.json();
-      if (!res.ok) { setError(j.error ?? "خطأ"); return; }
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(j.error ?? `تعذّرت الإضافة (${res.status}) — أعيدي المحاولة`); return; }
       setCreated({ fullName: j.assistant.fullName, phone: j.assistant.phone, password: j.password });
       setName(""); setPhone("");
       load();
+    } catch {
+      setError("تعذّر الاتصال بالخادم — تحقّقي من الإنترنت وأعيدي المحاولة");
     } finally { setBusy(false); }
   };
 

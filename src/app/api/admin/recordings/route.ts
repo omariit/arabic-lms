@@ -10,6 +10,11 @@ import { ACTIVE_STATUSES, createRemoteSession, fetchRemoteState, recordingConfig
 export async function GET() {
   const { user, error } = await apiUser("STAFF");
   if (error || !user) return error!;
+  // Same rule as creating a recording: the assistant is chat-only, and the list
+  // exposes playable videos of the lessons.
+  if (user.role === "ASSISTANT") {
+    return NextResponse.json({ error: "التسجيلات متاحة للمعلمة والإدارة فقط" }, { status: 403 });
+  }
 
   const rows = await db.recordingSession.findMany({
     where: user.role === "ADMIN" ? {} : { teacherId: user.id },

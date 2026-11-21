@@ -17,6 +17,18 @@ const { Server } = require("socket.io");
 const { createHmac, timingSafeEqual, randomBytes } = require("crypto");
 const { PrismaClient } = require("@prisma/client");
 
+/**
+ * Ownership rule for files shared in a live room — keep in sync with
+ * `src/lib/live-files.ts` (which is unit tested). Inlined because this custom
+ * server runs from the standalone build, where `src/` is not shipped.
+ */
+function liveFileKeyAllowed(key, { userId, liveSessionId }) {
+  if (typeof key !== "string") return false;
+  const parts = key.split("/");
+  if (parts.length < 4 || parts[0] !== "livefile") return false;
+  return parts[2] === liveSessionId || (Boolean(userId) && parts[2] === userId);
+}
+
 const port = parseInt(process.env.PORT || "3000", 10);
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
@@ -400,6 +412,11 @@ async function main() {
       if (!room || !p) return;
       const text = String(body || "").slice(0, 2000).trim();
       if (!text && !audioKey && !fileKey) return;
+      // The key must belong to this room: a user's own namespace, or the session
+      // namespace used by invited guests. Never trust a client-provided key.
+      if (fileKey && !liveFileKeyAllowed(fileKey, { userId: isGuest ? null : user.id, liveSessionId })) {
+        return socket.emit("meet:error", { message: "الملف غير مسموح في هذه الحصة" });
+      }
       try {
         const saved = await db.liveMessage.create({
           data: {

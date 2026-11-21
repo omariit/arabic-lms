@@ -110,6 +110,10 @@ test.describe("teacher console", () => {
     await student.getByRole("button", { name: /دخول/ }).click();
     await expect(student).toHaveURL(/\/dashboard/, { timeout: 90_000 });
     await ctx.close();
+
+    // Leave the account as the rest of the suite expects to find it.
+    const restore = await page.request.post(`/api/admin/students/${target!.id}/password`, { data: { password: state.password } });
+    expect(restore.ok()).toBe(true);
   });
 
   test("staff management creates an assistant who can sign in", async ({ page, browser }) => {

@@ -78,6 +78,48 @@ test.describe("in-house live meeting", () => {
       await expect(page.locator('input[type="file"][accept*="application/pdf"]')).toHaveCount(1);
     }
 
+    // ── guest uploads are authorised by the invite link, not by an account ──
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAJUlEQVQoU2NkYGD4z0AEYBxVSFyIRg0aNWhUIVGjBo0aVAgAS2gEAcO1s2sAAAAASUVORK5CYII=",
+      "base64",
+    );
+    // the composer lives inside the guest's chat panel
+    const guestChatBtn = guest.getByRole("button", { name: /الدردشة/ }).first();
+    if (await guestChatBtn.isVisible().catch(() => false)) await guestChatBtn.click();
+    // the file input is visually hidden behind the paperclip label
+    await expect(guest.getByTestId("meet-attach")).toHaveCount(1, { timeout: 30_000 });
+    await guest.getByTestId("meet-attach").setInputFiles({ name: "page.png", mimeType: "image/png", buffer: png });
+    await expect(guest.locator("body")).toContainText(/page\.png|جاهز للإرسال/, { timeout: 60_000 });
+
+    // ── the host can record the meeting into «تسجيلات الحصص» ──
+    const record = page.getByTestId("meet-record");
+    await expect(record).toBeVisible({ timeout: 30_000 });
+    {
+      await record.click();
+      await expect(page.getByTestId("meet-record")).toContainText(/إيقاف التسجيل/, { timeout: 120_000 });
+      await page.waitForTimeout(9_000);
+      await page.getByTestId("meet-record").click();
+      await expect(page.locator("body")).toContainText(/حُفظ التسجيل|تعذّر/, { timeout: 120_000 });
+
+      await expect
+        .poll(
+          async () => {
+            const res = await page.request.get("/api/admin/recordings");
+            const rows = res.ok() ? ((await res.json()).recordings ?? []) : [];
+            const live = rows.find((r: { title: string }) => r.title.includes("تسجيل حصة مباشرة"));
+            return live ? `${live.status}:${live.hasVideo}` : "missing";
+          },
+          { timeout: 180_000, intervals: [3000, 5000, 5000, 8000] },
+        )
+        .toBe("READY:true");
+
+      // clean up the recording created by this test
+      const rows = await (await page.request.get("/api/admin/recordings")).json();
+      for (const r of rows.recordings ?? []) {
+        if (r.title.includes("تسجيل حصة مباشرة")) await page.request.delete(`/api/admin/recordings/${r.id}`);
+      }
+    }
+
     // end the meeting for everyone
     page.on("dialog", (d) => d.accept());
     await page.getByRole("button", { name: /إنهاء الحصة/ }).click();

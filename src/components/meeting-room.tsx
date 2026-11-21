@@ -5,6 +5,8 @@ import { io, type Socket } from "socket.io-client";
 import { Button } from "@/components/ui/button";
 import { uploadToR2 } from "@/lib/upload-client";
 import { useAudioRecorder } from "@/hooks/use-audio-recorder";
+import { LiveSessionRecorder } from "@/lib/live-recorder";
+import { useIceServers } from "@/hooks/use-ice-servers";
 
 /**
  * In-house video meeting (no external service).
@@ -42,29 +44,19 @@ type ChatItem = {
 
 type Streams = { cam?: MediaStream; screen?: MediaStream; audio?: MediaStream };
 
-const ICE: RTCConfiguration = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    // Optional TURN relay for restrictive networks (set in Railway env).
-    ...(process.env.NEXT_PUBLIC_TURN_URL
-      ? [{
-          urls: process.env.NEXT_PUBLIC_TURN_URL,
-          username: process.env.NEXT_PUBLIC_TURN_USER ?? "",
-          credential: process.env.NEXT_PUBLIC_TURN_PASS ?? "",
-        }]
-      : []),
-  ],
-};
+
 
 export function MeetingRoom({
-  liveId, title, courseTitle, viewer, inviteToken, initialChat, onLeave,
+  liveId, title, courseTitle, viewer, inviteToken, initialChat, onLeave, recordingServiceUrl, courseId,
 }: {
   liveId: string;
   title: string;
   courseTitle: string;
   viewer: { role: Role; name: string; isGuest: boolean };
   inviteToken?: string;
+  /** Where chunks go (recording service) — host only. */
+  recordingServiceUrl?: string;
+  courseId?: string;
   initialChat: ChatItem[];
   onLeave?: () => void;
 }) {
@@ -100,6 +92,15 @@ export function MeetingRoom({
   const ringtoneRef = useRef<AudioContext | null>(null);
   const rec = useAudioRecorder(120);
   const [file, setFile] = useState<{ key: string; mime: string; name: string } | null>(null);
+  // Live <video> elements keyed by socket id — the recorder paints them into a grid.
+  const videoEls = useRef(new Map<string, HTMLVideoElement>());
+  const registerVideo = useCallback((id: string, el: HTMLVideoElement | null) => {
+    if (el) videoEls.current.set(id, el);
+    else videoEls.current.delete(id);
+  }, []);
+  const iceServers = useIceServers();
+  const [liveRec, setLiveRec] = useState<{ state: string; sent: number; queued: number; recordingId?: string } | null>(null);
+  const recorderRef = useRef<LiveSessionRecorder | null>(null);
   const [fileBusy, setFileBusy] = useState(false);
 
   const flash = useCallback((msg: string) => {
@@ -136,7 +137,7 @@ export function MeetingRoom({
     const existing = pcs.current.get(peerId);
     if (existing) return existing;
 
-    const pc = new RTCPeerConnection(ICE);
+    const pc = new RTCPeerConnection(iceServers);
     pcs.current.set(peerId, pc);
 
     if (initiator) {
@@ -194,7 +195,7 @@ export function MeetingRoom({
       })();
     }
     return pc;
-  }, []);
+  }, [iceServers]);
 
   const teardownPeer = useCallback((peerId: string) => {
     pcs.current.get(peerId)?.close();
@@ -511,20 +512,87 @@ export function MeetingRoom({
     const chosen = input.files?.[0];
     input.value = "";
     if (!chosen) return;
-    if (viewer.isGuest) {
-      flash("مشاركة الملفات متاحة للمسجّلات فقط");
-      return;
-    }
     setFileBusy(true);
     try {
-      const up = await uploadToR2(chosen, { kind: "livefile", mimeType: chosen.type });
-      setFile({ key: up.key, mime: up.mimeType, name: chosen.name });
+      if (viewer.isGuest) {
+        // Guests have no account: the invite token authorises the upload and the
+        // file is stored in the session's namespace.
+        const res = await fetch(`/api/live/${liveId}/guest-upload`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ invite: inviteToken ?? "", mimeType: chosen.type }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.uploadUrl) throw new Error(data.error ?? "تعذّر تجهيز الرفع");
+        const put = await fetch(data.uploadUrl, { method: "PUT", headers: { "content-type": chosen.type }, body: chosen });
+        if (!put.ok) throw new Error("تعذّر رفع الملف");
+        setFile({ key: data.key, mime: data.mimeType ?? chosen.type, name: chosen.name });
+      } else {
+        const up = await uploadToR2(chosen, { kind: "livefile", mimeType: chosen.type });
+        setFile({ key: up.key, mime: up.mimeType, name: chosen.name });
+      }
     } catch (e) {
       flash(e instanceof Error ? e.message : "تعذّر رفع الملف");
     } finally {
       setFileBusy(false);
     }
   };
+
+  /** Host: record the whole meeting (grid + mixed audio) into «تسجيلات الحصص». */
+  const toggleRecording = useCallback(async () => {
+    if (liveRec?.state === "recording") {
+      setLiveRec((r) => (r ? { ...r, state: "saving" } : r));
+      const rec = recorderRef.current;
+      const id = rec ? liveRec?.recordingId : undefined;
+      const flushed = (await rec?.stop()) ?? false;
+      recorderRef.current = null;
+      if (flushed && id) {
+        const fin = await fetch(`/api/admin/recordings/${id}/finalize`, { method: "POST" }).catch(() => null);
+        if (fin?.ok) flash("✓ حُفظ التسجيل — يظهر في «تسجيلات الحصص» بعد المعالجة");
+        else flash("تعذّر إنهاء التسجيل — يمكنك إنهاؤه من «تسجيلات الحصص»");
+      } else {
+        flash("بعض المقاطع لم تُرفع — أنهي التسجيل من «تسجيلات الحصص» بعد عودة الإنترنت");
+      }
+      setLiveRec({ state: "idle", sent: 0, queued: 0, recordingId: id });
+      return;
+    }
+
+    setLiveRec({ state: "starting", sent: 0, queued: 0 });
+    try {
+      const created = await fetch("/api/admin/recordings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title: `تسجيل حصة مباشرة — ${title}`, courseId: courseId ?? null }),
+      });
+      const data = await created.json().catch(() => ({}));
+      if (!created.ok || !data.id) throw new Error(data.error ?? "تعذّر بدء جلسة التسجيل");
+
+      const rec = new LiveSessionRecorder(
+        {
+          serviceUrl: recordingServiceUrl!,
+          sessionId: data.id,
+          uploadToken: data.uploadToken,
+          onState: (st) => setLiveRec((r) => ({ ...(r ?? { state: "recording" }), state: "recording", sent: st.sent, queued: st.queued, recordingId: data.id })),
+        },
+        () =>
+          roster.map((p) => ({
+            video: videoEls.current.get(p.socketId) ?? null,
+            label: p.name,
+          })),
+      );
+      const audioStreams = [
+        ...Object.values(remoteStreams).map((x) => x.audio).filter(Boolean),
+        localPreview,
+      ].filter(Boolean) as MediaStream[];
+      rec.start(audioStreams);
+      recorderRef.current = rec;
+      setLiveRec({ state: "recording", sent: 0, queued: 0, recordingId: data.id });
+      flash("⏺ يجري تسجيل الحصة — يُحفظ الفيديو في «تسجيلات الحصص»");
+    } catch (e) {
+      setLiveRec({ state: "idle", sent: 0, queued: 0 });
+      flash(e instanceof Error ? e.message : "تعذّر بدء التسجيل");
+    }
+  }, [liveRec, title, courseId, recordingServiceUrl, roster, remoteStreams, localPreview, flash]);
 
   const leave = () => {
     socketRef.current?.emit("meet:leave", { liveSessionId: liveId });
@@ -602,6 +670,7 @@ export function MeetingRoom({
             stream={remoteStreams[spotlighted.socketId]?.screen ?? remoteStreams[spotlighted.socketId]?.cam}
             isSelf={spotlighted.socketId === selfId}
             localStream={spotlighted.socketId === selfId ? localPreview : null}
+            registerEl={(el) => registerVideo(spotlighted.socketId, el)}
             big
           />
         )}
@@ -612,6 +681,7 @@ export function MeetingRoom({
             stream={remoteStreams[p.socketId]?.screen ?? remoteStreams[p.socketId]?.cam}
             localStream={p.socketId === selfId ? localPreview : null}
             isSelf={p.socketId === selfId}
+            registerEl={(el) => registerVideo(p.socketId, el)}
           />
         ))}
       </div>
@@ -624,6 +694,23 @@ export function MeetingRoom({
         <Button variant={camOn ? "default" : "outline"} onClick={toggleCam} className="min-w-[110px]">
           {camOn ? "📷 الكاميرا شغالة" : "📷 الكاميرا مغلقة"}
         </Button>
+        {isHost && !viewer.isGuest && recordingServiceUrl && (
+          <Button
+            variant={liveRec?.state === "recording" ? "destructive" : "outline"}
+            onClick={() => void toggleRecording()}
+            data-testid="meet-record"
+            className="min-w-[130px]"
+            disabled={liveRec?.state === "starting" || liveRec?.state === "saving"}
+          >
+            {liveRec?.state === "recording"
+              ? "⏹ إيقاف التسجيل"
+              : liveRec?.state === "starting"
+                ? "… تجهيز"
+                : liveRec?.state === "saving"
+                  ? "… حفظ"
+                  : "⏺ تسجيل الحصة"}
+          </Button>
+        )}
         {!viewer.isGuest && (
           <Button variant={screenOn ? "default" : "outline"} onClick={toggleScreen}>🖥 مشاركة الشاشة</Button>
         )}
@@ -767,23 +854,20 @@ export function MeetingRoom({
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendChat()}
             />
-            {!viewer.isGuest && (
-              <>
-                <label
-                  className={`cursor-pointer rounded-xl border border-brand-200 px-2.5 py-2 text-xs font-extrabold text-brand-800 ${fileBusy ? "opacity-50" : ""}`}
-                  title="إرفاق صورة أو ملف"
-                >
-                  {fileBusy ? "…" : "📎"}
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf,audio/*"
-                    className="hidden"
-                    disabled={fileBusy}
-                    onChange={(e) => void pickFile(e.currentTarget)}
-                  />
-                </label>
-              </>
-            )}
+            <label
+              className={`cursor-pointer rounded-xl border border-brand-200 px-2.5 py-2 text-xs font-extrabold text-brand-800 ${fileBusy ? "opacity-50" : ""}`}
+              title={viewer.isGuest ? "إرفاق صورة أو ملف (صور وPDF)" : "إرفاق صورة أو ملف"}
+            >
+              {fileBusy ? "…" : "📎"}
+              <input
+                type="file"
+                accept={viewer.isGuest ? "image/*,application/pdf" : "image/*,application/pdf,audio/*"}
+                className="hidden"
+                data-testid="meet-attach"
+                disabled={fileBusy}
+                onChange={(e) => void pickFile(e.currentTarget)}
+              />
+            </label>
             {!viewer.isGuest && (
               rec.state === "recording" ? (
                 <Button size="sm" variant="destructive" onClick={rec.stop}>⏹ {rec.seconds}s</Button>
@@ -802,13 +886,14 @@ export function MeetingRoom({
 }
 
 function VideoTile({
-  participant, stream, localStream, isSelf, big,
+  participant, stream, localStream, isSelf, big, registerEl,
 }: {
   participant: Participant;
   stream?: MediaStream;
   localStream?: MediaStream | null;
   isSelf?: boolean;
   big?: boolean;
+  registerEl?: (el: HTMLVideoElement | null) => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const active = localStream ?? stream;
@@ -828,7 +913,16 @@ function VideoTile({
 
   return (
     <div className={`relative overflow-hidden rounded-2xl border border-brand-100 bg-brand-950 ${big ? "aspect-video" : "aspect-video"}`}>
-      <video ref={ref} autoPlay playsInline muted={isSelf} className={`h-full w-full object-cover ${hasVideo ? "" : "opacity-0"}`} />
+      <video
+        ref={(el) => {
+          ref.current = el;
+          registerEl?.(el);
+        }}
+        autoPlay
+        playsInline
+        muted={isSelf}
+        className={`h-full w-full object-cover ${hasVideo ? "" : "opacity-0"}`}
+      />
       {!hasVideo && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-white/80">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-lg font-extrabold">
