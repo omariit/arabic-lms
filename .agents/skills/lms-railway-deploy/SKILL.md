@@ -82,3 +82,13 @@ the container start command (`prisma migrate deploy`); a schema change needs a d
   (`ERR_CONNECTION_REFUSED`). Use `x-forwarded-host` / `x-forwarded-proto` (see
   `src/app/api/auth/login-form/route.ts`).
 - Verify with `node scripts/check-login-nojs.mjs` (normal, `javaScriptEnabled: false`, wrong password).
+
+## Redirect loops (ERR_TOO_MANY_REDIRECTS)
+
+- **Never** let the edge middleware redirect `/login` → an app page. It can only verify the cookie's
+  *shape*, while the app page requires a session that is *alive in the database*: a revoked cookie
+  then loops /login → /dashboard → /login forever. The middleware now refuses to redirect `/login`
+  and deletes unverifiable cookies; `/login` itself does the authoritative `getCurrentUser()` check
+  (and honours `?switch=1` for shared devices).
+- Any redirect to `/login` caused by a bad cookie must delete that cookie in the same response.
+- Regression test: `node scripts/check-login-loop.mjs` (login → revoke → keep cookie).

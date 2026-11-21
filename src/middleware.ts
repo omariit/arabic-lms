@@ -57,15 +57,25 @@ export async function middleware(req: NextRequest) {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
       }
-      return NextResponse.redirect(url);
+      const res = NextResponse.redirect(url);
+      // A cookie that no longer verifies is junk: drop it, otherwise the browser
+      // keeps replaying it and the user bounces between /login and the app
+      // (ERR_TOO_MANY_REDIRECTS).
+      if (token && !session) res.cookies.delete(SESSION_COOKIE);
+      return res;
     }
   }
-  if (pathname === "/login" && session && !pathname.startsWith("/api/")) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/dashboard";
-    url.search = "";
-    return NextResponse.redirect(url);
+
+  if (pathname === "/login") {
+    const res = NextResponse.next();
+    // Never redirect /login away from here. The edge can only see the token's
+    // shape, not whether the session is still alive in the database, so a
+    // redirect here used to loop: /login → /dashboard → /login → ….
+    // The login page itself does the authoritative check (DB) and clears junk.
+    if (token && !session) res.cookies.delete(SESSION_COOKIE);
+    return res;
   }
+
   return NextResponse.next();
 }
 
