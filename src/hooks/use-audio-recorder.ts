@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * Enforces a max duration with progress, preview playback, and re-record.
  */
 
-export type RecorderState = "idle" | "recording" | "paused" | "recorded" | "error";
+export type RecorderState = "idle" | "requesting" | "recording" | "paused" | "recorded" | "error";
 
 export function pickMimeType(): string {
   if (typeof MediaRecorder === "undefined") return "";
@@ -57,6 +57,7 @@ export function useAudioRecorder(maxSeconds = 180) {
 
   const start = useCallback(async () => {
     setError(null);
+    setState("requesting");
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("المتصفح لا يدعم التسجيل الصوتي");
       if (typeof MediaRecorder === "undefined") throw new Error("المتصفح لا يدعم MediaRecorder");

@@ -8,6 +8,8 @@ import { useAudioRecorder } from "@/hooks/use-audio-recorder";
 import { LiveSessionRecorder } from "@/lib/live-recorder";
 import { useIceServers } from "@/hooks/use-ice-servers";
 import { AttendanceCard, LivePollCard, PollResultsCard, type ActivePoll, type AttendanceData, type PollProgress } from "@/components/live-poll";
+import { hasLiveVideo, pickVideoStream } from "@/lib/rtc-media";
+import { EMPTY_SUMMARY, QUALITY_LABEL, qualityOf, summarise, type PeerSummary } from "@/lib/rtc-stats";
 
 /**
  * In-house video meeting (no external service).
@@ -115,35 +117,64 @@ export function MeetingRoom({
   const [correctIndex, setCorrectIndex] = useState<string>("");
   const [durationSec, setDurationSec] = useState<string>("60");
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  // Connection quality (shown on demand, never covers the stage).
+  const [netStats, setNetStats] = useState<Record<string, PeerSummary>>({});
+  const [statsOpen, setStatsOpen] = useState(false);
+  const statsPrev = useRef<Record<string, { inBytes?: { bytes: number; time: number }; outBytes?: { bytes: number; time: number }; frames?: { bytes: number; time: number; frames?: number } }>>({});
+  /**
+   * What we *intend* to send. Reading state inside callbacks that live in a long-lived
+   * socket effect gave stale values (tracks were replaced with null right after the
+   * answer), so the intent lives in a ref that every code path sees immediately.
+   */
+  const mediaRef = useRef({ mic: false, cam: false, screen: false });
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const flash = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast((t) => (t === msg ? "" : t)), 3200);
   }, []);
 
-  /** Push the current local tracks into every peer connection. */
+  /** Push the current local tracks into every peer connection (ref-based, never stale). */
   const applyTracks = useCallback(() => {
+    const want = mediaRef.current;
+    const micTrack = local.current.mic?.getAudioTracks()[0] ?? null;
+    const camTrack = local.current.cam?.getVideoTracks()[0] ?? null;
+    const screenTrack = local.current.screen?.getVideoTracks()[0] ?? null;
     for (const [peerId, pc] of pcs.current) {
       const s = senders.current.get(peerId);
       if (!s) continue;
-      const micTrack = local.current.mic?.getAudioTracks()[0] ?? null;
-      const camTrack = local.current.cam?.getVideoTracks()[0] ?? null;
-      const screenTrack = local.current.screen?.getVideoTracks()[0] ?? null;
-      s.audio?.replaceTrack(micOn ? micTrack : null).catch(() => {});
-      s.cam?.replaceTrack(camOn ? camTrack : null).catch(() => {});
-      s.screen?.replaceTrack(screenOn ? screenTrack : null).catch(() => {});
-      void pc;
+      s.audio?.replaceTrack(want.mic ? micTrack : null).catch(() => {});
+      s.cam?.replaceTrack(want.cam ? camTrack : null).catch(() => {});
+      s.screen?.replaceTrack(want.screen ? screenTrack : null).catch(() => {});
+      // A transceiver negotiated without a track can be stuck at recvonly; flip it and
+      // renegotiate so the track actually travels.
+      let needsOffer = false;
+      for (const t of pc.getTransceivers()) {
+        if (t.direction !== "sendrecv" && t.direction !== "sendonly") {
+          try { t.direction = "sendrecv"; needsOffer = true; } catch { /* ignore */ }
+        }
+      }
+      if (needsOffer) {
+        void (async () => {
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socketRef.current?.emit("meet:signal", { target: peerId, data: { sdp: offer } });
+          } catch { /* the answer side may already be renegotiating */ }
+        })();
+      }
     }
-  }, [micOn, camOn, screenOn]);
+  }, []);
 
   const emitMedia = useCallback((next?: { micOn?: boolean; camOn?: boolean; screenOn?: boolean }) => {
+    const want = mediaRef.current;
     socketRef.current?.emit("meet:media", {
       liveSessionId: liveId,
-      micOn: next?.micOn ?? micOn,
-      camOn: next?.camOn ?? camOn,
-      screenOn: next?.screenOn ?? screenOn,
+      micOn: next?.micOn ?? want.mic,
+      camOn: next?.camOn ?? want.cam,
+      screenOn: next?.screenOn ?? want.screen,
     });
-  }, [liveId, micOn, camOn, screenOn]);
+  }, [liveId]);
 
   /** One peer connection per participant; newcomer is always the offerer. */
   const ensurePeer = useCallback((peerId: string, initiator: boolean) => {
@@ -168,6 +199,12 @@ export function MeetingRoom({
       const idx = pc.getTransceivers().findIndex((t) => t.mid === e.transceiver.mid);
       const purpose = idx <= 0 ? "audio" : idx === 1 ? "cam" : "screen";
       const stream = e.streams[0] ?? new MediaStream([e.track]);
+      // A negotiated-but-silent m-line starts muted and unmutes when frames arrive;
+      // re-render so the tile switches from the placeholder to the real video.
+      const wake = () => setRemoteStreams((prev) => ({ ...prev }));
+      e.track.addEventListener("unmute", wake);
+      e.track.addEventListener("mute", wake);
+      e.track.addEventListener("ended", wake);
       setRemoteStreams((prev) => {
         const current = prev[peerId] ?? {};
         return { ...prev, [peerId]: { ...current, [purpose]: stream } };
@@ -257,6 +294,38 @@ export function MeetingRoom({
     socketRef.current?.emit("meet:attendance", { liveSessionId: liveId });
   }, [liveId]);
 
+  /** Leaving as the host closes the lecture for everyone and locks the room. */
+  const exitRoom = useCallback(() => {
+    if (isHost) {
+      const ok = window.confirm(
+        "إنهاء الحصة والخروج؟\nستُغلق الغرفة على الجميع، وتنتهي المحاضرة، ولن تستطيع أي طالبة الدخول بعدها.",
+      );
+      if (!ok) return;
+      socketRef.current?.emit("meet:control", { liveSessionId: liveId, action: "end-lecture" });
+      setTimeout(() => {
+        socketRef.current?.emit("meet:leave", { liveSessionId: liveId });
+        if (onLeave) onLeave();
+        else window.location.href = "/admin/live";
+      }, 300);
+      return;
+    }
+    socketRef.current?.emit("meet:leave", { liveSessionId: liveId });
+    if (onLeave) onLeave();
+    else window.location.href = viewer.isGuest ? "/" : "/dashboard";
+  }, [isHost, liveId, onLeave, viewer.isGuest]);
+
+  /** Sharing lives in one visible place: file, voice note, screen. */
+  const openFilePicker = useCallback(() => {
+    setChatOpen(true);
+    setTimeout(() => fileInputRef.current?.click(), 60);
+  }, []);
+
+  const openVoiceRecorder = useCallback(() => {
+    setChatOpen(true);
+    if (rec.state === "recording") rec.stop();
+    else rec.start();
+  }, [rec]);
+
   // Countdown: students watch it, the host closes the question when it ends.
   useEffect(() => {
     if (!poll || !poll.open || !poll.closeAt) {
@@ -339,10 +408,16 @@ export function MeetingRoom({
         if (data.sdp) {
           await pc.setRemoteDescription(data.sdp);
           if (data.sdp.type === "offer") {
-            // Answerer learns its sender slots from the offered m-lines.
-            const order = pc.getTransceivers();
+            // Answerer learns its sender slots from the offered m-lines (audio, cam, screen).
+            // Chrome answers «recvonly» when a m-line has no track yet, and a track added
+            // later with replaceTrack would never be sent — so every m-line is forced to
+            // sendrecv *before* the answer is created. This is what made the teacher's
+            // video invisible to her students.
+            for (const t of pc.getTransceivers()) {
+              try { t.direction = "sendrecv"; } catch { /* older browsers */ }
+            }
             senders.current.set(from, {
-              audio: pc.getSenders()[order.findIndex((t) => t.mid !== null && order.indexOf(t) === 0)] ?? pc.getSenders()[0] ?? null,
+              audio: pc.getSenders()[0] ?? null,
               cam: pc.getSenders()[1] ?? null,
               screen: pc.getSenders()[2] ?? null,
             });
@@ -467,6 +542,32 @@ export function MeetingRoom({
   }, [liveId, inviteToken]);
 
   useEffect(() => { applyTracks(); }, [micOn, camOn, screenOn, applyTracks]);
+
+  // ── connection quality sampling (2.5s) ──
+  useEffect(() => {
+    if (status !== "in") return;
+    let alive = true;
+    const sample = async () => {
+      const next: Record<string, PeerSummary> = {};
+      for (const [peerId, pc] of pcs.current) {
+        try {
+          const report = await pc.getStats();
+          const list: Array<Record<string, unknown> & { type?: string }> = [];
+          report.forEach((r) => list.push(r as unknown as Record<string, unknown> & { type?: string }));
+          const now = Date.now();
+          const { summary, next: prev } = summarise(list, statsPrev.current[peerId], now);
+          statsPrev.current[peerId] = prev;
+          next[peerId] = summary;
+        } catch {
+          next[peerId] = { ...EMPTY_SUMMARY };
+        }
+      }
+      if (alive) setNetStats(next);
+    };
+    void sample();
+    const t = setInterval(() => void sample(), 2500);
+    return () => { alive = false; clearInterval(t); };
+  }, [status]);
   useEffect(() => { chatBottom.current?.scrollIntoView({ behavior: "smooth" }); }, [chat.length, chatOpen]);
 
   // Keep Railway from scaling to zero while a class is running.
@@ -483,7 +584,14 @@ export function MeetingRoom({
       const stream = await navigator.mediaDevices.getUserMedia(
         kind === "mic"
           ? { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }
-          : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } },
+          : {
+              video: {
+                width: { ideal: 960, max: 1280 },
+                height: { ideal: 540, max: 720 },
+                frameRate: { ideal: 24, max: 30 },
+                facingMode: "user",
+              },
+            },
       );
       local.current[kind] = stream;
       return stream;
@@ -495,6 +603,7 @@ export function MeetingRoom({
 
   const toggleMic = useCallback(async () => {
     if (micOn) {
+      mediaRef.current.mic = false;
       local.current.mic?.getAudioTracks().forEach((t) => t.stop());
       local.current.mic = null;
       setMicOn(false);
@@ -508,6 +617,7 @@ export function MeetingRoom({
     }
     const s = await getLocal("mic");
     if (!s) return;
+    mediaRef.current.mic = true;
     setMicOn(true);
     emitMedia({ micOn: true });
     setTimeout(() => applyTracks(), 0);
@@ -515,6 +625,7 @@ export function MeetingRoom({
 
   const toggleCam = useCallback(async () => {
     if (camOn) {
+      mediaRef.current.cam = false;
       local.current.cam?.getVideoTracks().forEach((t) => t.stop());
       local.current.cam = null;
       setCamOn(false);
@@ -529,6 +640,7 @@ export function MeetingRoom({
     }
     const s = await getLocal("cam");
     if (!s) return;
+    mediaRef.current.cam = true;
     setCamOn(true);
     setLocalPreview(s);
     emitMedia({ camOn: true });
@@ -537,6 +649,7 @@ export function MeetingRoom({
 
   const toggleScreen = useCallback(async () => {
     if (screenOn) {
+      mediaRef.current.screen = false;
       local.current.screen?.getTracks().forEach((t) => t.stop());
       local.current.screen = null;
       setScreenOn(false);
@@ -550,11 +663,13 @@ export function MeetingRoom({
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
       local.current.screen = stream;
       stream.getVideoTracks()[0].onended = () => {
+        mediaRef.current.screen = false;
         local.current.screen = null;
         setScreenOn(false);
         emitMedia({ screenOn: false });
         setTimeout(() => applyTracks(), 0);
       };
+      mediaRef.current.screen = true;
       setScreenOn(true);
       setLocalPreview(stream);
       emitMedia({ screenOn: true });
@@ -753,7 +868,9 @@ export function MeetingRoom({
           <Button size="sm" variant={chatOpen ? "default" : "outline"} onClick={() => setChatOpen((v) => !v)}>
             💬 {chat.some((c) => c.socketId !== selfId) ? "الدردشة" : "الدردشة"}
           </Button>
-          <Button size="sm" variant="destructive" onClick={leave}>خروج</Button>
+          <Button size="sm" variant="destructive" onClick={exitRoom} data-testid="leave-room">
+            {isHost ? "إنهاء وخروج" : "خروج"}
+          </Button>
         </div>
       </div>
 
@@ -764,7 +881,7 @@ export function MeetingRoom({
         {spotlighted && (
           <VideoTile
             participant={spotlighted}
-            stream={remoteStreams[spotlighted.socketId]?.screen ?? remoteStreams[spotlighted.socketId]?.cam}
+            stream={pickVideoStream(remoteStreams[spotlighted.socketId], Boolean(spotlighted.screenOn))}
             isSelf={spotlighted.socketId === selfId}
             localStream={spotlighted.socketId === selfId ? localPreview : null}
             registerEl={(el) => registerVideo(spotlighted.socketId, el)}
@@ -775,7 +892,7 @@ export function MeetingRoom({
           <VideoTile
             key={p.socketId}
             participant={p}
-            stream={remoteStreams[p.socketId]?.screen ?? remoteStreams[p.socketId]?.cam}
+            stream={pickVideoStream(remoteStreams[p.socketId], p.screenOn)}
             localStream={p.socketId === selfId ? localPreview : null}
             isSelf={p.socketId === selfId}
             registerEl={(el) => registerVideo(p.socketId, el)}
@@ -816,8 +933,30 @@ export function MeetingRoom({
                   : "⏺ تسجيل الحصة"}
           </Button>
         )}
+        <Button
+          variant={file ? "default" : "outline"}
+          onClick={openFilePicker}
+          data-testid="share-file"
+        >
+          📎 ملف أو صورة
+        </Button>
         {!viewer.isGuest && (
-          <Button variant={screenOn ? "default" : "outline"} onClick={toggleScreen}>🖥 مشاركة الشاشة</Button>
+          <Button
+            variant={rec.state === "recording" ? "destructive" : "outline"}
+            onClick={openVoiceRecorder}
+            data-testid="share-voice"
+          >
+            🎙 {rec.state === "recording" ? `إيقاف (${rec.seconds}ث)` : "مقطع صوتي"}
+          </Button>
+        )}
+        {!viewer.isGuest && (
+          <Button
+            variant={screenOn ? "default" : "outline"}
+            onClick={toggleScreen}
+            data-testid="share-screen"
+          >
+            🖥 {screenOn ? "إيقاف المشاركة" : "مشاركة الشاشة"}
+          </Button>
         )}
         {!isHost && (
           <Button variant={handRaised ? "success" : "outline"} onClick={toggleHand}>
@@ -996,6 +1135,62 @@ export function MeetingRoom({
         <AttendanceCard data={attendance} onRefresh={refreshAttendance} liveId={liveId} />
       )}
 
+      {/* connection quality — hidden until asked for */}
+      {status === "in" && (
+        <div className="fixed bottom-24 left-3 z-40 flex flex-col items-start gap-1.5 print:hidden">
+          {statsOpen && (
+            <div data-testid="net-stats" className="w-[260px] rounded-2xl border border-brand-200 bg-white/95 p-2.5 shadow-lg backdrop-blur">
+              <p className="mb-1.5 text-[11px] font-extrabold text-brand-950">📶 جودة الاتصال</p>
+              {roster.filter((r) => r.socketId !== selfId).length === 0 && (
+                <p className="text-[10px] text-brand-900/50">لا مشاركات أخريات بعد.</p>
+              )}
+              <ul className="space-y-1.5">
+                {roster
+                  .filter((r) => r.socketId !== selfId)
+                  .map((r) => {
+                    const st = netStats[r.socketId];
+                    const q = qualityOf(st);
+                    const dot = q === "good" ? "bg-emerald-500" : q === "fair" ? "bg-amber-500" : q === "poor" ? "bg-red-500" : "bg-gray-300";
+                    return (
+                      <li key={r.socketId} data-testid="net-stats-row" className="rounded-xl bg-brand-50/70 px-2 py-1.5">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="truncate text-[10px] font-extrabold text-brand-950">{r.name}</span>
+                          <span className="flex shrink-0 items-center gap-1 text-[9px] font-bold text-brand-800">
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${dot}`} />
+                            {QUALITY_LABEL[q]}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[9px] text-brand-900/60" dir="ltr">
+                          ↓{st?.inKbps ?? 0} ↑{st?.outKbps ?? 0} kbps
+                          {st?.rttMs != null ? ` · ${st.rttMs}ms` : ""}
+                          {st?.lossPct != null ? ` · loss ${st.lossPct}%` : ""}
+                        </p>
+                        <p className="text-[9px] text-brand-900/45" dir="ltr">
+                          {st?.width && st?.height ? `${st.width}×${st.height}` : "—"}
+                          {st?.fps ? ` · ${st.fps}fps` : ""}
+                          {st?.candidate ? ` · ${st.candidate}` : ""}
+                        </p>
+                      </li>
+                    );
+                  })}
+              </ul>
+              <p className="mt-1.5 text-[9px] leading-4 text-brand-900/45">
+                التحديث كل ثانيتين ونصف. إن ظهر «ضعيف» أو relay فالاتصال يمر بخادم وسيط.
+              </p>
+            </div>
+          )}
+          <button
+            type="button"
+            data-testid="net-stats-toggle"
+            aria-expanded={statsOpen}
+            onClick={() => setStatsOpen((v) => !v)}
+            className="rounded-full border border-brand-200 bg-white/95 px-3 py-2 text-[11px] font-extrabold text-brand-900 shadow-md backdrop-blur"
+          >
+            📶 {statsOpen ? "إخفاء" : "جودة الاتصال"}
+          </button>
+        </div>
+      )}
+
       {/* chat */}
       {chatOpen && (
         <div className="flex flex-col rounded-2xl border border-brand-100 bg-white" style={{ height: "55dvh" }}>
@@ -1055,6 +1250,7 @@ export function MeetingRoom({
                 type="file"
                 accept={viewer.isGuest ? "image/*,application/pdf" : "image/*,application/pdf,audio/*"}
                 className="hidden"
+                ref={fileInputRef}
                 data-testid="meet-attach"
                 disabled={fileBusy}
                 onChange={(e) => void pickFile(e.currentTarget)}
@@ -1089,19 +1285,20 @@ function VideoTile({
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const active = localStream ?? stream;
+  const hasVideo = hasLiveVideo(active);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (active) {
-      el.srcObject = active;
-      el.play().catch(() => {});
-    } else {
+    if (!active) {
       el.srcObject = null;
+      return;
     }
-  }, [active]);
-
-  const hasVideo = Boolean(active && active.getVideoTracks().length > 0);
+    if (el.srcObject !== active) el.srcObject = active;
+    // Audio travels on its own element, so the tile is always muted: that is what
+    // lets mobile browsers autoplay it without a fresh gesture.
+    el.play().catch(() => {});
+  }, [active, hasVideo]);
 
   return (
     <div className={`relative overflow-hidden rounded-2xl border border-brand-100 bg-brand-950 ${big ? "aspect-video" : "aspect-video"}`}>
@@ -1112,7 +1309,8 @@ function VideoTile({
         }}
         autoPlay
         playsInline
-        muted={isSelf}
+        muted
+        onLoadedData={(e) => { void (e.currentTarget as HTMLVideoElement).play().catch(() => {}); }}
         className={`h-full w-full object-cover ${hasVideo ? "" : "opacity-0"}`}
       />
       {!hasVideo && (

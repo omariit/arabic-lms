@@ -247,7 +247,7 @@ export function BoardStage({
           onClick={() => setShowTools((v) => !v)}
           title={showTools ? "إخفاء الأدوات" : "إظهار الأدوات"}
           data-testid="board-toggle-tools"
-          className="absolute left-2 top-2 z-10 flex h-9 items-center gap-1 rounded-lg bg-black/60 px-3 text-[11px] font-extrabold text-white backdrop-blur"
+          className="absolute left-2 top-2 z-10 flex h-10 items-center gap-1 rounded-lg bg-black/60 px-3 text-[11px] font-extrabold text-white backdrop-blur"
         >
           {showTools ? "🙈 إخفاء الأدوات" : "👁 الأدوات"}
         </button>
@@ -287,16 +287,16 @@ export function BoardStage({
             </label>
 
             <div className="flex items-center gap-1 rounded-xl bg-brand-50 p-1">
-              <button type="button" onClick={() => goto(pageIndex - 1)} disabled={pageIndex === 0} className="h-8 rounded-lg px-2 text-xs font-extrabold text-brand-900 disabled:opacity-30">◀</button>
+              <button type="button" onClick={() => goto(pageIndex - 1)} disabled={pageIndex === 0} className="h-10 min-w-10 rounded-lg px-2 text-xs font-extrabold text-brand-900 disabled:opacity-30">◀</button>
               <span className="min-w-12 text-center text-[11px] font-bold" dir="ltr">{pageCount ? `${pageIndex + 1}/${pageCount}` : "—"}</span>
-              <button type="button" onClick={() => goto(pageIndex + 1)} disabled={pageIndex >= pageCount - 1} className="h-8 rounded-lg px-2 text-xs font-extrabold text-brand-900 disabled:opacity-30">▶</button>
+              <button type="button" onClick={() => goto(pageIndex + 1)} disabled={pageIndex >= pageCount - 1} className="h-10 min-w-10 rounded-lg px-2 text-xs font-extrabold text-brand-900 disabled:opacity-30">▶</button>
             </div>
 
             <div className="flex items-center gap-1 rounded-xl bg-brand-50 p-1">
-              <button type="button" onClick={() => setZoom((z) => Math.min(5, +(z + 0.2).toFixed(2)))} className="h-8 w-8 rounded-lg text-sm font-extrabold text-brand-900">＋</button>
+              <button type="button" onClick={() => setZoom((z) => Math.min(5, +(z + 0.2).toFixed(2)))} className="h-10 w-10 rounded-lg text-sm font-extrabold text-brand-900">＋</button>
               <span className="min-w-10 text-center text-[11px] font-bold" dir="ltr">{Math.round(zoom * 100)}%</span>
-              <button type="button" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.2).toFixed(2)))} className="h-8 w-8 rounded-lg text-sm font-extrabold text-brand-900">－</button>
-              <button type="button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="h-8 rounded-lg px-2 text-[11px] font-extrabold text-brand-900">توسيط</button>
+              <button type="button" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.2).toFixed(2)))} className="h-10 w-10 rounded-lg text-sm font-extrabold text-brand-900">－</button>
+              <button type="button" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="h-10 min-w-10 rounded-lg px-2 text-[11px] font-extrabold text-brand-900">توسيط</button>
             </div>
 
             <button

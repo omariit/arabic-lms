@@ -348,7 +348,13 @@ async function main() {
         screenOn: false,
         joinedAt: Date.now(),
       });
-      if (isHost && !room.hostSocketId) room.hostSocketId = socket.id;
+      if (isHost && !room.hostSocketId) {
+        room.hostSocketId = socket.id;
+        if (room.graceTimer) {
+          clearTimeout(room.graceTimer);
+          room.graceTimer = null;
+        }
+      }
 
       // Attendance log for enrolled students
       if (live.status === "LIVE" && !isGuest && user.role === "STUDENT") {
@@ -407,7 +413,7 @@ async function main() {
     });
 
     // --- HOST moderation ---
-    socket.on("meet:control", ({ liveSessionId, action, target, value }) => {
+    socket.on("meet:control", async ({ liveSessionId, action, target, value }) => {
       const room = rooms.get(liveSessionId);
       if (!room || room.hostSocketId !== socket.id) return; // host only
       const targetId = typeof target === "string" ? target : null;
@@ -498,11 +504,10 @@ async function main() {
           meet.to(liveSessionId).emit("meet:spotlight", { socketId: value || null });
           break;
         }
+        case "end-lecture":
         case "end-meeting": {
-          db.liveSession
-            .update({ where: { id: liveSessionId }, data: { status: "ENDED", endedAt: new Date() } })
-            .catch(() => {});
-          meet.to(liveSessionId).emit("meet:ended", { message: "أنهت المعلمة الحصة" });
+          // Same path as the host leaving: lock the room, close questions, kick everyone.
+          await endLecture(liveSessionId, "أنهت المعلمة الحصة — شكرًا لحضورك 🌿");
           break;
         }
         default:
@@ -691,6 +696,46 @@ async function main() {
     });
   });
 
+  /**
+   * The lecture is over: mark it ended in the database, tell everyone, and close the
+   * room so nobody can join again (meet:join refuses ENDED sessions).
+   */
+  async function endLecture(liveSessionId, message) {
+    const room = rooms.get(liveSessionId);
+    await db.liveSession
+      .update({ where: { id: liveSessionId }, data: { status: "ENDED", endedAt: new Date() } })
+      .catch(() => {});
+    await db.livePoll
+      .updateMany({ where: { liveSessionId, status: "OPEN" }, data: { status: "CLOSED", closedAt: new Date() } })
+      .catch(() => {});
+    if (!room) return;
+    for (const p of room.participants.values()) {
+      if (p.userId && p.role === "STUDENT") {
+        db.attendanceLog
+          .findFirst({ where: { liveSessionId, userId: p.userId, leftAt: null }, orderBy: { joinedAt: "desc" } })
+          .then((log) => log && db.attendanceLog.update({ where: { id: log.id }, data: { leftAt: new Date() } }))
+          .catch(() => {});
+      }
+    }
+    meet.to(liveSessionId).emit("meet:ended", {
+      message: message || "أنهت المعلمة الحصة — شكرًا لحضورك 🌿",
+    });
+    const sockets = [...room.participants.keys()];
+    room.participants.clear();
+    room.waiting.clear();
+    room.hostSocketId = null;
+    room.activePoll = null;
+    room.graceTimer && clearTimeout(room.graceTimer);
+    room.graceTimer = null;
+    rooms.delete(liveSessionId);
+    setTimeout(() => {
+      for (const id of sockets) {
+        const sk = meet.sockets.get(id);
+        if (sk) sk.disconnect(true);
+      }
+    }, 900);
+  }
+
   function leaveRoom(liveSessionId, socketId, explicit) {
     const room = rooms.get(liveSessionId);
     if (!room) return;
@@ -710,16 +755,26 @@ async function main() {
         .catch(() => {});
       room.activePoll = null;
     }
-    room.waiting.delete(socketId);
-    room.participants.delete(socketId);
-
-    meet.to(liveSessionId).emit("meet:peer-left", { socketId });
     if (wasHost) {
-      // Host left: promote the next staff member, otherwise close the room politely.
+      // A deliberate «إنهاء وخروج» arrives as meet:end-lecture and ends at once.
+      // Anything else (tab closed, network drop, reload) keeps the room alive for
+      // 30 seconds so a blip never kills a lecture.
       const nextHost = [...room.participants.values()].find((p) => STAFF.has(p.role));
       room.hostSocketId = nextHost ? nextHost.socketId : null;
-      if (!nextHost) meet.to(liveSessionId).emit("meet:host-left", { message: "خرجت المعلمة من الحصة" });
-      else meet.to(nextHost.socketId).emit("meet:you-are-host", {});
+      if (nextHost) {
+        meet.to(nextHost.socketId).emit("meet:you-are-host", {});
+      } else {
+        room.graceTimer && clearTimeout(room.graceTimer);
+        room.graceTimer = setTimeout(() => {
+          const r = rooms.get(liveSessionId);
+          const hostBack = Boolean(r && r.hostSocketId && r.participants.has(r.hostSocketId));
+          if (hostBack) return;
+          endLecture(liveSessionId, "انقطعت المعلمة عن الحصة — انتهت المحاضرة").catch(() => {});
+        }, 30_000);
+        meet.to(liveSessionId).emit("meet:host-left", {
+          message: "المعلمة خرجت مؤقتًا — إن لم تعد خلال ٣٠ ثانية تُغلق الحصة",
+        });
+      }
     }
     broadcastRoster(room, liveSessionId);
 

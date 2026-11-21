@@ -184,13 +184,34 @@ export function LessonInbox({ lesson, initialStudent }: { lesson: Lesson; initia
             <div className="flex items-center gap-2">
               <Button onClick={reply} disabled={sending || (!draft.trim() && !rec.blob)} className="flex-1">{sending ? "…" : "إرسال التصحيح"}</Button>
               {rec.state === "recording" ? (
-                <Button variant="destructive" onClick={rec.stop}>⏹ ({rec.seconds}s)</Button>
+                <Button variant="destructive" onClick={rec.stop} data-testid="rec-stop">
+                  ⏹ إيقاف ({rec.seconds}ث)
+                </Button>
+              ) : rec.state === "requesting" ? (
+                <Button variant="outline" disabled>… بانتظار إذن الميكروفون</Button>
               ) : rec.blob ? (
-                <Button variant="outline" onClick={rec.reset}>🎙 جاهز 🗑</Button>
+                <Button variant="outline" onClick={rec.reset} data-testid="rec-reset">
+                  🎙 جاهز 🗑
+                </Button>
               ) : (
-                <Button variant="outline" onClick={rec.start}>🎙 تصحيح صوتي</Button>
+                <Button variant="outline" onClick={() => void rec.start()} data-testid="rec-start">
+                  🎙 تصحيح صوتي
+                </Button>
               )}
             </div>
+            {rec.state === "recording" && (
+              <p className="text-center text-[11px] font-bold text-red-600">
+                🔴 يسجّل الآن ({rec.seconds} ثانية من {rec.maxSeconds}) — اضغطي «إيقاف» عند الانتهاء
+              </p>
+            )}
+            {rec.error && (
+              <p data-testid="rec-error" className="rounded-xl bg-red-50 px-3 py-2 text-[11px] font-bold text-red-700">
+                ⚠️ {rec.error}
+                <span className="mt-1 block font-normal text-red-600/80">
+                  تأكّدي من السماح للميكروفون من إعدادات المتصفح لهذا الموقع، ثم أعيدي المحاولة.
+                </span>
+              </p>
+            )}
           </div>
         </div>
       )}
