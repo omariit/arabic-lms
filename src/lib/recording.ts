@@ -97,10 +97,12 @@ async function call<T>(path: string, init: RequestInit = {}, options: CallOption
         await new Promise((r) => setTimeout(r, retryDelayMs * (attempt + 1)));
         continue;
       }
-      const message =
-        isColdStartStatus(res.status) && !(data as { error?: string }).error
-          ? COLD_START_ERROR
-          : ((data as { error?: string }).error ?? `خطأ من خدمة التسجيل (${res.status})`);
+      if (isColdStartStatus(res.status)) {
+        // Edge 5xx = still waking up. Normalise to 503 so callers treat it as
+        // "retry later" rather than a server fault of ours.
+        throw new RecordingServiceError(COLD_START_ERROR, 503);
+      }
+      const message = (data as { error?: string }).error ?? `خطأ من خدمة التسجيل (${res.status})`;
       throw new RecordingServiceError(message, res.status);
     }
     return data as T;
