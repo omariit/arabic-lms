@@ -181,7 +181,7 @@ export function PollResultsCard({
         </p>
       )}
       <p data-testid="poll-missing" className="mt-1 text-[11px] font-bold leading-6 text-amber-800">
-        {missing.length > 0 ? `⏳ لم تُجب بعد: ${missing.map((m) => m.name).join("، ")}` : "✓ جميع الطالبات أجبن"}
+        {missing.length > 0 ? `⏳ لم تُجب: ${missing.map((m) => m.name).join("، ")}` : "✓ جميع الطالبات أجبن"}
       </p>
     </div>
   );
