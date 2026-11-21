@@ -12,11 +12,16 @@ test.describe("teacher console", () => {
       if (r.url().includes("/api/") && r.status() >= 400) failures.push(`${r.status()} ${r.url()}`);
     });
     await page.goto("/admin");
-    await expect(page.getByRole("link", { name: /الحصص المباشرة/ }).or(page.getByText(/الحصص المباشرة/)).first()).toBeVisible();
+    // The nav renders twice (phone bar + desktop bar); only one is displayed.
+    await expect(page.getByRole("link", { name: /الحصص المباشرة/ }).locator("visible=true").first()).toBeVisible();
+    // Desktop shows every destination in one row (phones use the «المزيد» sheet).
+    await expect(page.getByRole("link", { name: /تسجيلات الحصص/ }).locator("visible=true").first()).toBeVisible();
     await page.goto("/admin/courses");
     await expect(page.locator("body")).toContainText("دورة اختبار الجودة", { timeout: 30_000 });
     await page.goto("/admin/enrollments");
-    await expect(page.locator("body")).toContainText("طلب اختبار آلي", { timeout: 30_000 });
+    // Independent of which request the seed or an earlier spec created.
+    await expect(page.locator("body")).toContainText(/طلبات بانتظار الموافقة|المسجلات الحاليات/, { timeout: 30_000 });
+    await expect(page.getByRole("button", { name: /رفض/ }).locator("visible=true").first()).toBeVisible();
     expect(failures, `failed calls: ${failures.join(", ")}`).toHaveLength(0);
   });
 
