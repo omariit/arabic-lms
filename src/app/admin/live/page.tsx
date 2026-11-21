@@ -19,6 +19,7 @@ export default async function AdminLivePage() {
 
   return (
     <main className="space-y-6">
+      <h1 className="sr-only">الحصص المباشرة</h1>
       <OneClickLauncher youtubeConnected={Boolean(oauth)} />
 
       <section>

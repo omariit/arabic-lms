@@ -28,7 +28,7 @@ export function newAudioKey(kind: "submission" | "feedback", userId: string): st
 }
 
 /** Upload categories — every one of them is browser → R2 direct (the app only ever sees the key). */
-export type UploadKind = "submission" | "feedback" | "lesson" | "receipt" | "cover" | "resource";
+export type UploadKind = "submission" | "feedback" | "lesson" | "receipt" | "cover" | "resource" | "livefile";
 
 export const UPLOAD_KINDS: Record<
   UploadKind,
@@ -40,6 +40,12 @@ export const UPLOAD_KINDS: Record<
   receipt: { staffOnly: false, mimes: ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"], maxBytes: 8 * 1024 * 1024 },
   // Course cover artwork (Udemy-style hero image) — teacher only.
   cover: { staffOnly: true, mimes: ["image/jpeg", "image/png", "image/webp"], maxBytes: 5 * 1024 * 1024 },
+  // Material shared inside a live room (image/PDF/audio) — staff and students.
+  livefile: {
+    staffOnly: false,
+    mimes: ["image/jpeg", "image/png", "image/webp", "application/pdf", "audio/webm", "audio/mp4", "audio/mpeg", "audio/ogg"],
+    maxBytes: 25 * 1024 * 1024,
+  },
   // Downloadable lesson material: PDF, images, or an audio recitation file — teacher only.
   resource: {
     staffOnly: true,

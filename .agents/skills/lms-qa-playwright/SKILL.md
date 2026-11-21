@@ -56,6 +56,8 @@ QA accounts (staging): `+962790000001` admin, `…0002` teacher, `…0003` assis
 | Flake | Real cause | Handling |
 |---|---|---|
 | login fails "still at /login" | cold start + client redirect race; 429 after many attempts | helper navigates explicitly after 200 and backs off on 429 |
+| studio test says "الدرس عنده تسجيل بالفعل" | one recording per lesson | every studio spec first deletes recordings of its course |
+| audit shows tiny/overlapping nav labels | too many items in one row | staff nav = 4 primary + «المزيد» sheet; `scripts/ux-audit.mjs` guards it |
 | account looks "broken" after repeated tries | the limiter used to count *attempts* | now counts failures only and resets on success (`tests/login-rate-limit.test.ts`) |
 | `tls_get_more_records` on video | Railway edge drops a connection when a media stream is aborted | `getWithRetry` |
 | empty admin screen in a test | the screen genuinely did not auto-load (bug, not flake) | keep the assertion; fix the component |

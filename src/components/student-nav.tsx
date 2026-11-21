@@ -41,7 +41,7 @@ export async function StudentNav({ current }: { current?: string }) {
               <span className="text-base">{it.icon}</span>
               {it.label}
               {it.badge > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-emerald-950">
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-extrabold text-emerald-950">
                   {it.badge > 9 ? "٩+" : it.badge.toLocaleString("ar-EG")}
                 </span>
               )}

@@ -100,7 +100,7 @@ export default async function CoursesPage() {
                         : "مجانية"}
                     </span>
                   </div>
-                  <p className="mt-1 text-[10px] text-gray-400">
+                  <p className="mt-1 text-[11px] text-gray-400">
                     {c._count.enrollments > 0
                       ? `${c._count.enrollments} طالبة مسجّلة · السعر بـ${countryName(country, locale)}`
                       : `السعر بـ${countryName(country, locale)}`}

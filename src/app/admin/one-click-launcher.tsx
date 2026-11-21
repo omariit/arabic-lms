@@ -118,7 +118,7 @@ export function OneClickLauncher({ youtubeConnected }: { youtubeConnected: boole
               </Button>
               {!youtubeConnected && (
                 <p className="mt-1 text-center text-[11px] text-gray-500">
-                  غير مرتبط — <Link href="/admin/profile" className="font-bold text-brand-600 underline">اربطي القناة</Link>
+                  غير مرتبط — <Link href="/admin/profile" className="inline-flex h-10 items-center rounded-lg bg-brand-100 px-3 text-xs font-extrabold text-brand-800">اربطي القناة</Link>
                 </p>
               )}
             </div>

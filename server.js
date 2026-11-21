@@ -394,12 +394,12 @@ async function main() {
     });
 
     // --- In-room chat (text + voice note) ---
-    socket.on("meet:chat", async ({ liveSessionId, body, audioKey, audioMime }) => {
+    socket.on("meet:chat", async ({ liveSessionId, body, audioKey, audioMime, fileKey, fileMime, fileName }) => {
       const room = rooms.get(liveSessionId);
       const p = room?.participants.get(socket.id);
       if (!room || !p) return;
       const text = String(body || "").slice(0, 2000).trim();
-      if (!text && !audioKey) return;
+      if (!text && !audioKey && !fileKey) return;
       try {
         const saved = await db.liveMessage.create({
           data: {
@@ -409,6 +409,9 @@ async function main() {
             body: text,
             audioKey: audioKey || null,
             audioMime: audioMime || null,
+            fileKey: fileKey || null,
+            fileMime: fileMime || null,
+            fileName: fileName ? String(fileName).slice(0, 160) : null,
           },
         });
         meet.to(liveSessionId).emit("meet:chat", {
@@ -418,6 +421,9 @@ async function main() {
           authorRole: isGuest ? "GUEST" : user.role,
           body: text,
           hasAudio: Boolean(audioKey),
+          hasFile: Boolean(fileKey),
+          fileName: fileName ? String(fileName).slice(0, 160) : null,
+          fileMime: fileMime || null,
           createdAt: saved.createdAt,
         });
       } catch { /* chat persistence is best-effort */ }

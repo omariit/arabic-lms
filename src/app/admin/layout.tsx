@@ -1,17 +1,17 @@
-import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
 import { PushManager } from "@/components/push-manager";
 import { InstallPrompt } from "@/components/install-prompt";
 import { LogoutButton } from "@/components/logout-button";
+import { StaffNav } from "@/components/staff-nav";
 
 const NAV = [
-  { href: "/admin/chat", label: "الرسائل", icon: "📨", staff: true, badge: "chat" },
-  { href: "/admin/inbox", label: "الواجبات", icon: "📥", staff: true, badge: "homework" },
-  { href: "/admin", label: "الرئيسية", icon: "🏠", teacher: true },
+  { href: "/admin/chat", label: "الرسائل", icon: "📨", staff: true, badge: "chat", primary: true },
+  { href: "/admin/inbox", label: "الواجبات", icon: "📥", staff: true, badge: "homework", primary: true },
+  { href: "/admin", label: "الرئيسية", icon: "🏠", teacher: true, primary: true },
   { href: "/admin/studio", label: "استوديو التسجيل", icon: "🎬", teacher: true },
   { href: "/admin/recordings", label: "تسجيلات الحصص", icon: "📼", teacher: true },
-  { href: "/admin/live", label: "الحصص المباشرة", icon: "🔴", teacher: true },
+  { href: "/admin/live", label: "الحصص المباشرة", icon: "🔴", teacher: true, primary: true },
   { href: "/admin/grading", label: "التصحيح", icon: "🎤", teacher: true },
   { href: "/admin/enrollments", label: "طلبات الانتساب", icon: "✅", teacher: true },
   { href: "/admin/landing", label: "الصفحة", icon: "🎨", teacher: true },
@@ -45,7 +45,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     if (n.adminOnly && !isAdmin) return false;
     return n.teacher !== false;
   });
-  const cols = nav.length;
+  const count = (badge?: string) => (badge === "homework" ? homeworkUnread : badge === "chat" ? chatUnread : 0);
+  const toItem = (n: (typeof NAV)[number]) => ({ href: n.href, label: n.label, icon: n.icon, badge: count("badge" in n ? (n.badge as string) : undefined) });
 
   return (
     <div className="min-h-dvh pb-24">
@@ -65,25 +66,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         {children}
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-100 bg-white shadow-lg">
-        <div className="mx-auto grid max-w-3xl" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {nav.map((n) => (
-            <Link key={n.href} href={n.href} className="relative flex flex-col items-center gap-0.5 py-3 text-[11px] font-bold text-brand-900 hover:bg-brand-50">
-              <span className="text-xl">{n.icon}</span>
-              {n.label}
-              {(() => {
-                const count = n.badge === "homework" ? homeworkUnread : n.badge === "chat" ? chatUnread : 0;
-                if (!count) return null;
-                return (
-                  <span className="absolute right-3 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-emerald-950">
-                    {count > 9 ? "٩+" : count.toLocaleString("ar-EG")}
-                  </span>
-                );
-              })()}
-            </Link>
-          ))}
-        </div>
-      </nav>
+      <StaffNav
+        primary={nav.filter((n) => n.primary).map(toItem)}
+        more={nav.filter((n) => !n.primary).map(toItem)}
+      />
     </div>
   );
 }

@@ -74,6 +74,8 @@ test.describe("in-house live meeting", () => {
         await page.keyboard.press("Enter");
         await expect(page.locator("body")).toContainText("رسالة اختبار من المعلمة", { timeout: 30_000 });
       }
+      // Material sharing (image / PDF / audio) is part of the same composer.
+      await expect(page.locator('input[type="file"][accept*="application/pdf"]')).toHaveCount(1);
     }
 
     // end the meeting for everyone

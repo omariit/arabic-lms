@@ -21,6 +21,7 @@ export default async function AdminDashboard() {
 
   return (
     <main className="space-y-6">
+      <h1 className="sr-only">لوحة {isAdmin ? "الإدارة" : "المعلمة"} — نظرة سريعة</h1>
       {/* One-click live launcher — the teacher's primary action */}
       <OneClickLauncher youtubeConnected={Boolean(oauth)} />
 

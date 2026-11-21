@@ -35,7 +35,9 @@ type Participant = {
 
 type ChatItem = {
   id: string; socketId?: string; authorName: string; authorRole: string | null;
-  body: string; createdAt: string; hasAudio?: boolean; audioUrl?: string | null;
+  body: string; createdAt: string;
+  hasAudio?: boolean; audioUrl?: string | null;
+  hasFile?: boolean; fileName?: string | null; fileMime?: string | null; fileUrl?: string | null;
 };
 
 type Streams = { cam?: MediaStream; screen?: MediaStream; audio?: MediaStream };
@@ -97,6 +99,8 @@ export function MeetingRoom({
   const chatBottom = useRef<HTMLDivElement>(null);
   const ringtoneRef = useRef<AudioContext | null>(null);
   const rec = useAudioRecorder(120);
+  const [file, setFile] = useState<{ key: string; mime: string; name: string } | null>(null);
+  const [fileBusy, setFileBusy] = useState(false);
 
   const flash = useCallback((msg: string) => {
     setToast(msg);
@@ -473,7 +477,7 @@ export function MeetingRoom({
 
   const sendChat = async () => {
     const text = draft.trim();
-    if (!text && !rec.blob) return;
+    if (!text && !rec.blob && !file) return;
     let audioKey: string | undefined;
     let audioMime: string | undefined;
     if (rec.blob && !viewer.isGuest) {
@@ -489,9 +493,37 @@ export function MeetingRoom({
         return;
       }
     }
-    socketRef.current?.emit("meet:chat", { liveSessionId: liveId, body: text, audioKey, audioMime });
+    socketRef.current?.emit("meet:chat", {
+      liveSessionId: liveId,
+      body: text,
+      audioKey,
+      audioMime,
+      fileKey: file?.key,
+      fileMime: file?.mime,
+      fileName: file?.name,
+    });
     setDraft("");
     rec.reset();
+    setFile(null);
+  };
+
+  const pickFile = async (input: HTMLInputElement) => {
+    const chosen = input.files?.[0];
+    input.value = "";
+    if (!chosen) return;
+    if (viewer.isGuest) {
+      flash("مشاركة الملفات متاحة للمسجّلات فقط");
+      return;
+    }
+    setFileBusy(true);
+    try {
+      const up = await uploadToR2(chosen, { kind: "livefile", mimeType: chosen.type });
+      setFile({ key: up.key, mime: up.mimeType, name: chosen.name });
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "تعذّر رفع الملف");
+    } finally {
+      setFileBusy(false);
+    }
   };
 
   const leave = () => {
@@ -704,12 +736,29 @@ export function MeetingRoom({
                     ) : m.hasAudio ? (
                       <a href={`/api/live/${liveId}/voice/${m.id}`} className="mt-1 inline-block text-[11px] font-bold underline">🎙 تسجيل صوتي</a>
                     ) : null}
+                    {m.fileMime?.startsWith("image/") ? (
+                      <a href={`/api/live/${liveId}/file/${m.id}`} target="_blank" rel="noreferrer" className="mt-1 block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/api/live/${liveId}/file/${m.id}?inline=1`} alt={m.fileName ?? "صورة"} className="max-h-40 rounded-lg" />
+                        <span className="mt-0.5 block text-[10px] font-bold underline">🖼 {m.fileName}</span>
+                      </a>
+                    ) : m.hasFile ? (
+                      <a href={`/api/live/${liveId}/file/${m.id}`} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[11px] font-bold underline">
+                        📎 {m.fileName ?? "ملف مرفق"}
+                      </a>
+                    ) : null}
                   </div>
                 </div>
               );
             })}
             <div ref={chatBottom} />
           </div>
+          {file && (
+            <div className="flex items-center justify-between gap-2 border-t border-brand-100 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-900">
+              <span className="truncate">📎 {file.name} — جاهز للإرسال</span>
+              <button type="button" onClick={() => setFile(null)} className="shrink-0 underline">إزالة</button>
+            </div>
+          )}
           <div className="flex items-center gap-1.5 border-t border-brand-100 p-2.5">
             <input
               className="min-w-0 flex-1 rounded-xl border border-brand-100 bg-brand-50/50 px-2.5 py-2 text-xs outline-none focus:border-brand-400"
@@ -718,6 +767,23 @@ export function MeetingRoom({
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendChat()}
             />
+            {!viewer.isGuest && (
+              <>
+                <label
+                  className={`cursor-pointer rounded-xl border border-brand-200 px-2.5 py-2 text-xs font-extrabold text-brand-800 ${fileBusy ? "opacity-50" : ""}`}
+                  title="إرفاق صورة أو ملف"
+                >
+                  {fileBusy ? "…" : "📎"}
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf,audio/*"
+                    className="hidden"
+                    disabled={fileBusy}
+                    onChange={(e) => void pickFile(e.currentTarget)}
+                  />
+                </label>
+              </>
+            )}
             {!viewer.isGuest && (
               rec.state === "recording" ? (
                 <Button size="sm" variant="destructive" onClick={rec.stop}>⏹ {rec.seconds}s</Button>

@@ -506,6 +506,10 @@ model LiveMessage {
   body          String   @db.Text @default("")
   audioKey      String?
   audioMime     String?
+  // Shared material during the broadcast: an image, a PDF, a document or audio.
+  fileKey       String?
+  fileMime      String?
+  fileName      String?
   createdAt     DateTime @default(now())
 
   liveSession LiveSession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)

@@ -1,7 +1,7 @@
 "use client";
 
 /** Upload categories understood by `POST /api/r2/upload`. */
-export type UploadKind = "submission" | "feedback" | "lesson" | "receipt" | "cover" | "resource";
+export type UploadKind = "submission" | "feedback" | "lesson" | "receipt" | "cover" | "resource" | "livefile";
 
 export type UploadResult = { key: string; mimeType: string; size: number };
 

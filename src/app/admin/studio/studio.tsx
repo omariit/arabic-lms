@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { SlideStage } from "@/components/slide-stage";
 import { Card, CardContent, Label, Select, Input } from "@/components/ui/primitives";
 import { cn, formatSeconds } from "@/lib/utils";
 
@@ -58,7 +59,17 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
   const [courseId, setCourseId] = useState("");
   const [lessonId, setLessonId] = useState("");
   const [title, setTitle] = useState("");
-  const [source, setSource] = useState<"screen" | "camera">("screen");
+  const [source, setSource] = useState<"slides" | "screen" | "camera">("screen");
+  const slideStreamRef = useRef<MediaStream | null>(null);
+  const handleSlideStream = useCallback((stream: MediaStream | null) => {
+    slideStreamRef.current = stream;
+  }, []);
+  // Screen sharing does not exist on iPhone/iPad; the presentation board does.
+  useEffect(() => {
+    const canShareScreen = typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getDisplayMedia === "function";
+    if (!canShareScreen) setSource("slides");
+  }, []);
+  const [slideCount, setSlideCount] = useState(0);
   const [withMic, setWithMic] = useState(true);
 
   const [phase, setPhase] = useState<"idle" | "starting" | "recording" | "paused" | "finishing" | "processing" | "ready" | "error">("idle");
@@ -245,7 +256,13 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
         source === "camera"
           ? await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, frameRate: 30 }, audio: false })
           : null;
-      const videoStream = screenStream ?? camStream!;
+      // Presentation mode: the canvas IS the camera, so no screen share is needed
+      // (works on iPhone/iPad where getDisplayMedia does not exist).
+      const slideStream = source === "slides" ? slideStreamRef.current : null;
+      if (source === "slides" && !slideStream) {
+        throw new Error("أضيفي صورة واحدة على الأقل في لوحة العرض قبل بدء التسجيل");
+      }
+      const videoStream = (screenStream ?? slideStream ?? camStream)!;
       const micStream = withMic ? await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }) : null;
       streamsRef.current = [videoStream, micStream].filter(Boolean) as MediaStream[];
 
@@ -531,8 +548,14 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label htmlFor="studio-source">مصدر الصورة</Label>
-                <Select id="studio-source" value={source} onChange={(e) => setSource(e.target.value as "screen" | "camera")}>
-                  <option value="screen">🖥 مشاركة الشاشة (PDF / سبورة / عرض)</option>
+                <Select
+                  id="studio-source"
+                  value={source}
+                  onChange={(e) => setSource(e.target.value as "slides" | "screen" | "camera")}
+                  disabled={phase !== "idle" && phase !== "error"}
+                >
+                  <option value="slides">🖼️ لوحة العرض (صور + تكبير + قلم) — تعمل على الجوال</option>
+                  <option value="screen">🖥 مشاركة الشاشة (PDF / سبورة)</option>
                   <option value="camera">📷 الكاميرا</option>
                 </Select>
               </div>
@@ -548,7 +571,7 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
               size="lg"
               className="w-full text-base"
               onClick={start}
-              disabled={phase === "starting" || waking.active || !canUseService}
+              disabled={phase === "starting" || waking.active || !canUseService || (source === "slides" && slideCount === 0)}
             >
               {waking.active
                 ? `⏳ نُجهّز خدمة التسجيل… ${waking.seconds}ث`
@@ -563,12 +586,23 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
               </p>
             )}
             <p className="text-center text-[11px] text-gray-500">
-              عند المشاركة اختاري «الشاشة كاملة» أو «علامة تبويب» ثم اسمحي بالصوت. الفيديو يُرفع أثناء التسجيل،
-              لذلك لا يضيع منك درس بسبب انقطاع.
+              {source === "slides"
+                ? "أضيفي صور الدرس في «لوحة العرض» بالأسفل، ثم ابدئي التسجيل — صوتك وصورتك يُسجَّلان معًا."
+                : "عند المشاركة اختاري «الشاشة كاملة» أو «علامة تبويب» ثم اسمحي بالصوت. الفيديو يُرفع أثناء التسجيل، لذلك لا يضيع منك درس بسبب انقطاع."}
             </p>
           </CardContent>
         </Card>
       ) : null}
+
+      {source === "slides" &&
+        ["idle", "error", "starting", "recording", "paused", "finishing"].includes(phase) && (
+          <Card className="border-brand-200">
+            <CardContent className="space-y-2 py-4">
+              <p className="text-sm font-extrabold text-brand-950">🖼️ لوحة العرض</p>
+              <SlideStage onStream={handleSlideStream} onCount={setSlideCount} />
+            </CardContent>
+          </Card>
+        )}
 
       {(phase === "recording" || phase === "paused" || phase === "finishing") && (
         <Card className={cn("border-2", phase === "paused" ? "border-amber-300" : "border-red-300")}>
@@ -709,7 +743,12 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
                     <option key={l.id} value={l.id}>{l.title}</option>
                   ))}
                 </Select>
-                <Link href="/admin/recordings"><Button variant="outline">كل التسجيلات</Button></Link>
+                <Link
+                  href="/admin/recordings"
+                  className="inline-flex h-11 items-center gap-1 rounded-xl border-2 border-brand-200 bg-white px-4 text-xs font-extrabold text-brand-900"
+                >
+                  📼 كل التسجيلات
+                </Link>
               </div>
               {attachMsg && <p className="mt-1 text-xs font-bold text-brand-700">{attachMsg}</p>}
             </div>

@@ -79,19 +79,19 @@ export function InboxClient() {
         <button
           type="button"
           onClick={() => setFilter("unread")}
-          className={cn("rounded-xl px-3 py-2 text-xs font-extrabold", filter === "unread" ? "bg-brand-600 text-white" : "bg-white text-brand-800 ring-1 ring-brand-200")}
+          className={cn("h-11 rounded-xl px-4 text-xs font-extrabold", filter === "unread" ? "bg-brand-600 text-white" : "bg-white text-brand-800 ring-1 ring-brand-200")}
         >
           غير المقروءة {unreadThreads > 0 && `(${unreadThreads})`}
         </button>
         <button
           type="button"
           onClick={() => setFilter("all")}
-          className={cn("rounded-xl px-3 py-2 text-xs font-extrabold", filter === "all" ? "bg-brand-600 text-white" : "bg-white text-brand-800 ring-1 ring-brand-200")}
+          className={cn("h-11 rounded-xl px-4 text-xs font-extrabold", filter === "all" ? "bg-brand-600 text-white" : "bg-white text-brand-800 ring-1 ring-brand-200")}
         >
           الكل ({items.length})
         </button>
         {unreadMessages > 0 && (
-          <button type="button" onClick={markAll} className="ms-auto rounded-xl bg-emerald-50 px-3 py-2 text-xs font-extrabold text-emerald-800">
+          <button type="button" onClick={markAll} className="ms-auto h-11 rounded-xl bg-emerald-50 px-4 text-xs font-extrabold text-emerald-800">
             تعليم الكل كمقروء
           </button>
         )}

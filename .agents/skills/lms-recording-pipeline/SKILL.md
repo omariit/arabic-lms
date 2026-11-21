@@ -37,6 +37,19 @@ retrying upload queue), `docs/recording.md` (full reference).
 5. **Node FS flags** — use `"w"`, never `"wb"` (`fs.open(..., "wb")` throws
    `The argument 'flags' is invalid` and silently failed every finalize).
 
+## Third video source: the presentation board
+
+`SlideStage` publishes `canvas.captureStream(30)` and the studio records it exactly like a camera or
+a shared screen. Rules that keep it working:
+
+1. Keep the callback identity stable (`useCallback` in the studio) — otherwise React re-runs the
+   capture effect on every render and `slideStreamRef` flickers to null.
+2. The stage must stay **mounted** from idle through `finishing`; unmounting stops the canvas track
+   and the recorder gets no frames.
+3. Require at least one image before starting (the button is disabled), and keep redrawing even when
+   nothing changes — a silent canvas can starve the encoder.
+4. iOS has no `getDisplayMedia`: default to this source when it is missing.
+
 ## Scale-to-zero (Railway app sleeping)
 
 The service sleeps when idle, so the first request of the day may take 10–30s and the edge returns

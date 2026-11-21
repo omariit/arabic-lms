@@ -17,7 +17,7 @@ const buttonVariants = cva(
       size: {
         default: "h-11 px-5",
         lg: "h-14 px-7 text-base", // large touch-friendly teacher buttons
-        sm: "h-9 px-3 text-xs",
+        sm: "h-10 px-3 text-xs", // 40px: still compact, but thumb-friendly
         icon: "h-11 w-11",
       },
     },

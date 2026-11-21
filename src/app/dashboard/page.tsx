@@ -9,7 +9,7 @@ import { VoucherRedeem } from "./voucher-redeem";
 import { ExamFeedback } from "@/components/exam-feedback";
 import { PushManager } from "@/components/push-manager";
 import { InstallPrompt } from "@/components/install-prompt";
-import { LogoutButton } from "@/components/logout-button";
+
 
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -78,7 +78,7 @@ export default async function StudentDashboard() {
           <h1 className="text-2xl font-extrabold">مرحبًا {user.fullName} 👋</h1>
           <p className="text-sm text-gray-500">لوحة الطالبة</p>
         </div>
-        <LogoutButton />
+        
       </header>
 
       {/* PWA: notifications + install */}
