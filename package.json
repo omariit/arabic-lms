@@ -5,15 +5,16 @@
   "scripts": {
     "dev": "node server.js",
     "build": "prisma generate && next build",
-    "start": "node server.js",
-    "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
-    "qa:seed": "node prisma/seed-qa.mjs",
+    "postinstall": "prisma generate",
+    "prebuild": "node scripts/copy-pdf-worker.mjs",
     "qa": "playwright test",
     "qa:report": "playwright show-report qa-report",
+    "qa:seed": "node prisma/seed-qa.mjs",
     "qa:smoke": "playwright test tests/e2e/06-smoke.spec.ts",
-    "recording:test": "cd recording-service && node --test tests"
+    "recording:test": "cd recording-service && node --test tests",
+    "start": "node server.js"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
@@ -26,8 +27,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "googleapis": "^144.0.0",
+    "jszip": "^3.10.2",
     "lucide-react": "^0.469.0",
     "next": "^15.1.3",
+    "pdfjs-dist": "^6.5.438",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "socket.io": "^4.8.1",

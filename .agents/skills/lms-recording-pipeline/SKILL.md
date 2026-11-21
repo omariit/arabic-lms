@@ -37,13 +37,17 @@ retrying upload queue), `docs/recording.md` (full reference).
 5. **Node FS flags** — use `"w"`, never `"wb"` (`fs.open(..., "wb")` throws
    `The argument 'flags' is invalid` and silently failed every finalize).
 
-## Third video source: the presentation board
+## Third video source: the explanation board (BoardStage)
 
-`SlideStage` publishes `canvas.captureStream(30)` and the studio records it exactly like a camera or
+`BoardStage` publishes `canvas.captureStream(30)` and the studio records it exactly like a camera or
 a shared screen. Rules that keep it working:
 
 1. Keep the callback identity stable (`useCallback` in the studio) — otherwise React re-runs the
-   capture effect on every render and `slideStreamRef` flickers to null.
+   capture effect on every render and the stream ref flickers to null.
+5. Files are parsed in the browser (`src/lib/board-pages.ts`): pdf.js for PDF, JSZip for .docx/.pptx.
+   The pdf worker must exist in `public/` — `npm run prebuild` copies it, so **build before deploy**.
+6. Screen share goes through the same canvas (video element → drawImage), which is how annotations
+   appear on top of a shared screen in the recording.
 2. The stage must stay **mounted** from idle through `finishing`; unmounting stops the canvas track
    and the recorder gets no frames.
 3. Require at least one image before starting (the button is disabled), and keep redrawing even when

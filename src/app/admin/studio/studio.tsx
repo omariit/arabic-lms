@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { SlideStage } from "@/components/slide-stage";
+import { BoardStage } from "@/components/board-stage";
 import { Card, CardContent, Label, Select, Input } from "@/components/ui/primitives";
 import { cn, formatSeconds } from "@/lib/utils";
 
@@ -59,17 +59,15 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
   const [courseId, setCourseId] = useState("");
   const [lessonId, setLessonId] = useState("");
   const [title, setTitle] = useState("");
-  const [source, setSource] = useState<"slides" | "screen" | "camera">("screen");
+  const [source, setSource] = useState<"board" | "screen" | "camera">("board");
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const slideStreamRef = useRef<MediaStream | null>(null);
   const handleSlideStream = useCallback((stream: MediaStream | null) => {
     slideStreamRef.current = stream;
   }, []);
-  // Screen sharing does not exist on iPhone/iPad; the presentation board does.
-  useEffect(() => {
-    const canShareScreen = typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getDisplayMedia === "function";
-    if (!canShareScreen) setSource("slides");
-  }, []);
-  const [slideCount, setSlideCount] = useState(0);
+
+  const [boardPages, setBoardPages] = useState(0);
+  const boardReady = boardPages > 0;
   const [withMic, setWithMic] = useState(true);
 
   const [phase, setPhase] = useState<"idle" | "starting" | "recording" | "paused" | "finishing" | "processing" | "ready" | "error">("idle");
@@ -248,23 +246,30 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
       }
 
       // media acquisition
-      const screenStream =
+      // Screen sharing feeds the board as well, so the teacher can annotate the
+      // shared screen and the annotations end up inside the recording.
+      const display =
         source === "screen"
           ? await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true })
           : null;
+      setScreenStream(display);
       const camStream =
         source === "camera"
           ? await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, frameRate: 30 }, audio: false })
           : null;
-      // Presentation mode: the canvas IS the camera, so no screen share is needed
-      // (works on iPhone/iPad where getDisplayMedia does not exist).
-      const slideStream = source === "slides" ? slideStreamRef.current : null;
-      if (source === "slides" && !slideStream) {
-        throw new Error("أضيفي صورة واحدة على الأقل في لوحة العرض قبل بدء التسجيل");
+
+      // Board mode: the canvas IS the camera, so no screen-share permission is
+      // needed (works on iPhone/iPad too).
+      const boardStream = source === "camera" ? null : slideStreamRef.current;
+      if (source === "board" && !boardStream) {
+        throw new Error("أضيفي ملفًا واحدًا على الأقل في اللوحة قبل بدء التسجيل");
       }
-      const videoStream = (screenStream ?? slideStream ?? camStream)!;
+      if (source === "screen" && display && !boardStream) {
+        throw new Error("تعذّر تجهيز لوحة الشرح — أعيدي تحميل الصفحة ثم حاولي");
+      }
+      const videoStream = (boardStream ?? camStream)!;
       const micStream = withMic ? await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }) : null;
-      streamsRef.current = [videoStream, micStream].filter(Boolean) as MediaStream[];
+      streamsRef.current = [videoStream, micStream, display].filter(Boolean) as MediaStream[];
 
       // mix mic + (optional) shared-tab audio into ONE audio track
       const ctx = new AudioContext();
@@ -276,7 +281,7 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
         gain.gain.value = 1;
         micSrc.connect(gain).connect(dest);
       }
-      const sharedAudio = screenStream?.getAudioTracks() ?? [];
+      const sharedAudio = display?.getAudioTracks() ?? [];
       if (sharedAudio.length) {
         const sysSrc = ctx.createMediaStreamSource(new MediaStream(sharedAudio));
         const gain = ctx.createGain();
@@ -551,11 +556,11 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
                 <Select
                   id="studio-source"
                   value={source}
-                  onChange={(e) => setSource(e.target.value as "slides" | "screen" | "camera")}
+                  onChange={(e) => setSource(e.target.value as "board" | "screen" | "camera")}
                   disabled={phase !== "idle" && phase !== "error"}
                 >
-                  <option value="slides">🖼️ لوحة العرض (صور + تكبير + قلم) — تعمل على الجوال</option>
-                  <option value="screen">🖥 مشاركة الشاشة (PDF / سبورة)</option>
+                  <option value="board">📄 ملف ولوحة الشرح (PDF · صورة · Word · PowerPoint)</option>
+                  <option value="screen">🖥 مشاركة الشاشة + الشرح عليها</option>
                   <option value="camera">📷 الكاميرا</option>
                 </Select>
               </div>
@@ -571,7 +576,7 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
               size="lg"
               className="w-full text-base"
               onClick={start}
-              disabled={phase === "starting" || waking.active || !canUseService || (source === "slides" && slideCount === 0)}
+              disabled={phase === "starting" || waking.active || !canUseService || (source === "board" && !boardReady)}
             >
               {waking.active
                 ? `⏳ نُجهّز خدمة التسجيل… ${waking.seconds}ث`
@@ -586,26 +591,40 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
               </p>
             )}
             <p className="text-center text-[11px] text-gray-500">
-              {source === "slides"
-                ? "أضيفي صور الدرس في «لوحة العرض» بالأسفل، ثم ابدئي التسجيل — صوتك وصورتك يُسجَّلان معًا."
-                : "عند المشاركة اختاري «الشاشة كاملة» أو «علامة تبويب» ثم اسمحي بالصوت. الفيديو يُرفع أثناء التسجيل، لذلك لا يضيع منك درس بسبب انقطاع."}
+              {source === "board"
+                ? "أضيفي ملف الدرس في اللوحة بالأسفل (PDF أو صورة أو Word أو PowerPoint)، ثم ابدئي التسجيل — صوتك وشرحك على الملف يُسجَّلان معًا."
+                : source === "screen"
+                  ? "اختاري «الشاشة كاملة» أو «علامة تبويب» ثم اسمحي بالصوت — يمكنك الشرح بالقلم على الشاشة المشتركة، ويظهر ذلك في التسجيل."
+                  : "الفيديو يُرفع أثناء التسجيل، لذلك لا يضيع منك درس بسبب انقطاع."}
             </p>
           </CardContent>
         </Card>
       ) : null}
 
-      {source === "slides" &&
-        ["idle", "error", "starting", "recording", "paused", "finishing"].includes(phase) && (
-          <Card className="border-brand-200">
-            <CardContent className="space-y-2 py-4">
-              <p className="text-sm font-extrabold text-brand-950">🖼️ لوحة العرض</p>
-              <SlideStage onStream={handleSlideStream} onCount={setSlideCount} />
-            </CardContent>
-          </Card>
-        )}
+      {source !== "camera" && ["idle", "error", "starting", "recording", "paused", "finishing"].includes(phase) && (
+        <Card className="border-brand-200">
+          <CardContent className="space-y-2 py-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-extrabold text-brand-950">
+                {source === "screen" ? "🖥 الشاشة المشتركة + الشرح" : "📄 لوحة الشرح"}
+              </p>
+              {(phase === "recording" || phase === "paused") && (
+                <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-extrabold text-red-700">
+                  تُسجَّل الآن — الأدوات لا تظهر في الفيديو
+                </span>
+              )}
+            </div>
+            <BoardStage
+              onStream={handleSlideStream}
+              screenStream={source === "screen" ? screenStream : null}
+              onPages={(n) => setBoardPages(n)}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {(phase === "recording" || phase === "paused" || phase === "finishing") && (
-        <Card className={cn("border-2", phase === "paused" ? "border-amber-300" : "border-red-300")}>
+        <Card className={cn("border-2", phase === "paused" ? "border-amber-300" : "border-red-300")} data-testid="recording-panel">
           <CardContent className="space-y-3 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -657,15 +676,39 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
             )}
 
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={togglePause} disabled={phase === "finishing"}>
+              <Button variant="outline" className="h-12" onClick={togglePause} disabled={phase === "finishing"}>
                 {phase === "paused" ? "▶ استئناف" : "⏸ إيقاف مؤقت"}
               </Button>
-              <Button variant="destructive" className="flex-1" onClick={finish} disabled={phase === "finishing"}>
-                {phase === "finishing" ? "جارٍ الإنهاء…" : "⏹ إنهاء الحصة واستخراج الفيديو"}
+              <Button variant="destructive" className="h-12 flex-1 text-base" onClick={finish} disabled={phase === "finishing"} data-testid="stop-recording">
+                {phase === "finishing" ? "جارٍ الإنهاء…" : "⏹ إيقاف التسجيل واستخراج الفيديو"}
               </Button>
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {(phase === "recording" || phase === "paused" || phase === "finishing") && (
+        <div className="fixed inset-x-0 bottom-16 z-30 border-t border-red-200 bg-white/95 px-3 py-2 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] backdrop-blur">
+          <div className="mx-auto flex max-w-3xl items-center gap-2">
+            <span className={cn("h-3 w-3 shrink-0 rounded-full", phase === "paused" ? "bg-amber-500" : "animate-pulse bg-red-600")} />
+            <span className="rounded-lg bg-brand-950 px-2 py-0.5 text-sm font-extrabold tabular-nums text-white" dir="ltr">
+              {new Date(elapsed * 1000).toISOString().slice(11, 19)}
+            </span>
+            <Button variant="outline" size="sm" className="h-10" onClick={togglePause} disabled={phase === "finishing"}>
+              {phase === "paused" ? "▶" : "⏸"}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-10 flex-1"
+              onClick={finish}
+              disabled={phase === "finishing"}
+              data-testid="stop-recording-sticky"
+            >
+              {phase === "finishing" ? "جارٍ الإنهاء…" : "⏹ إيقاف التسجيل"}
+            </Button>
+          </div>
+        </div>
       )}
 
       {(phase === "processing" || (recording && (recording.status === "PROCESSING" || recording.status === "UPLOADING"))) && (

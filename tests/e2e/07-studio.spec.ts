@@ -60,7 +60,8 @@ test.describe("teaching studio recording", () => {
     // the queue must drain by itself once the network is back
     await page.waitForTimeout(6000);
 
-    await page.getByRole("button", { name: /إنهاء الحصة واستخراج الفيديو/ }).click();
+    // The sticky stop bar is what a teacher on a phone reaches for.
+    await page.getByTestId("stop-recording-sticky").click();
 
     // processing → ready (ffmpeg runs in the recording service)
     await expect(page.getByText(/التسجيل جاهز/)).toBeVisible({ timeout: 180_000 });
