@@ -28,6 +28,22 @@ export async function login(page: Page, key: keyof QaState["phone"]) {
 
   for (let attempt = 0; attempt < 4; attempt++) {
     await page.goto("/login");
+
+    // Already signed in (a retry, or a session left by a previous step): the login
+    // form is not rendered at all, so go straight to the right home page.
+    if (!(await page.getByLabel("رقم الهاتف").isVisible().catch(() => false))) {
+      const role = await page.evaluate(async () => {
+        const res = await fetch("/api/auth/session", { cache: "no-store" }).catch(() => null);
+        const data = res && res.ok ? await res.json().catch(() => null) : null;
+        return (data as { user?: { role?: string } } | null)?.user?.role ?? null;
+      });
+      if (role) {
+        await page.goto(role === "STUDENT" ? "/dashboard" : "/admin", { waitUntil: "domcontentloaded" });
+        return;
+      }
+      await page.goto("/login");
+    }
+
     await page.getByLabel("رقم الهاتف").fill(localPhone(acc.phone));
     await page.getByLabel("كلمة المرور").fill(state.password);
 
@@ -36,19 +52,20 @@ export async function login(page: Page, key: keyof QaState["phone"]) {
       .catch(() => null);
     await page.getByRole("button", { name: /دخول/ }).click();
 
-    const ok = await page
-      .waitForURL(/\/(admin|dashboard)/, { timeout: 60_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (ok) return;
-
-    // 429 = too many attempts from this IP for this number: wait out the window.
     const res = await loginResponse;
+    if (res?.status() === 200) {
+      // Authenticated for sure: navigate explicitly instead of racing the
+      // client-side redirect (cold starts made this flaky).
+      const body = (await res.json().catch(() => ({}))) as { role?: string };
+      await page.goto(body.role === "STUDENT" ? "/dashboard" : "/admin", { waitUntil: "domcontentloaded" });
+      await page.waitForURL(/\/(admin|dashboard)/, { timeout: 30_000 }).catch(() => {});
+      return;
+    }
+
     if (res?.status() === 429 || (await page.getByText(/محاولات كثيرة/).isVisible().catch(() => false))) {
       await page.waitForTimeout(35_000);
       continue;
     }
-    // Cold start / network blip: one more go before failing loudly.
     if (attempt < 2) {
       await page.waitForTimeout(2500);
       continue;

@@ -4,7 +4,7 @@ import { apiUser } from "@/lib/auth";
 
 /** Students list for the device-lock reset console. */
 export async function GET() {
-  const { error } = await apiUser("ADMIN");
+  const { error } = await apiUser("STAFF");
   if (error) return error;
   const students = await db.user.findMany({
     where: { role: "STUDENT" },

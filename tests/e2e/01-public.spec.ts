@@ -29,7 +29,7 @@ test.describe("public site", () => {
     await expect(card).toBeVisible();
     await card.click();
     await page.waitForURL(new RegExp(courseId));
-    await expect(page.locator("body")).toContainText("تلاوة صحيحة"); // outcomes
+    await expect(page.locator("body")).toContainText("ماذا ستتعلّمين"); // outcomes section (its text is editable by the teacher)
     await expect(page.locator("body")).toContainText("إلمام بقراءة القرآن"); // requirements
     await expect(page.locator("body")).toContainText("السبت 6:00 م"); // weekly meetings
   });
@@ -62,7 +62,7 @@ test.describe("public site", () => {
 
     const sw = await request.get("/sw.js");
     expect(sw.ok()).toBe(true);
-    expect(await sw.text()).toContain("muqriah-v4");
+    expect(await sw.text()).toContain("muqriah-v5");
 
     // private areas must never be indexable
     const off = await page.goto("/offline");

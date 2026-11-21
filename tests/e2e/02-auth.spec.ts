@@ -22,6 +22,19 @@ test.describe("authentication & session resilience", () => {
     await expect(page.locator("p.text-red-600, p.bg-red-50").first()).toBeVisible();
     await expect(page).toHaveURL(/\/login/);
   });
+  test("signs in with Arabic-Indic digits and smart dashes", async ({ page }) => {
+    const state = qaState();
+    // ٠٧٩٠٠٠٠٠٠٢ as typed on an Arabic keyboard, and a password whose "-" was
+    // turned into an en-dash by a mobile keyboard.
+    const arabicDigits = localPhone(state.phone.teacher.phone).replace(/[0-9]/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]);
+    const smartPassword = state.password.replace(/-/g, "–");
+
+    await page.goto("/login");
+    await page.getByLabel("رقم الهاتف").fill(arabicDigits);
+    await page.getByLabel("كلمة المرور").fill(smartPassword);
+    await page.getByRole("button", { name: /دخول/ }).click();
+    await expect(page).toHaveURL(/\/admin/, { timeout: 60_000 });
+  });
 
   test("a tampered session cookie sends her to login instead of a broken dashboard", async ({ page, context }) => {
     await page.goto("/admin/courses");

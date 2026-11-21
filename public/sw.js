@@ -4,11 +4,9 @@
  * 2) Web Push: live-class alerts, chat messages, exam grading.
  * 3) Notification click: focus an open window or open the target URL.
  */
-const VERSION = "muqriah-v4";
+const VERSION = "muqriah-v5";
 const APP_SHELL = [
   "/",
-  "/login",
-  "/register",
   "/offline",
   "/logo.png",
   "/logo-square.png",
@@ -33,6 +31,9 @@ self.addEventListener("activate", (event) => {
 });
 
 const PRIVATE_PREFIXES = ["/admin", "/dashboard", "/lesson", "/exam", "/live", "/api"];
+// Auth pages must always be fresh: a cached login form kept serving an old bundle
+// after a deploy, which made signing in fail with no visible reason.
+const NETWORK_ONLY = ["/login", "/register", "/offline"];
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
@@ -45,7 +46,10 @@ self.addEventListener("fetch", (event) => {
 
   // Personal pages must never come from the cache: a stale shell showing a
   // logged-in dashboard after the session ended is worse than a slow load.
-  if (PRIVATE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`))) {
+  if (
+    PRIVATE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`)) ||
+    NETWORK_ONLY.includes(url.pathname)
+  ) {
     event.respondWith(fetch(request).catch(() => caches.match("/offline")));
     return;
   }

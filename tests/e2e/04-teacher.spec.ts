@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login, qaState, shot, uploadViaPresign } from "./helpers";
+import { localPhone, login, qaState, shot, uploadViaPresign } from "./helpers";
 
 test.describe("teacher console", () => {
   test.beforeEach(async ({ page }) => {
@@ -63,6 +63,48 @@ test.describe("teacher console", () => {
     await expect(page.locator("body")).toContainText(/صندوق الواجبات/, { timeout: 40_000 });
     await page.getByRole("button", { name: /صندوق الواجبات/ }).click();
     await expect(page.locator("body")).toContainText("سارة الاختبار", { timeout: 40_000 });
+  });
+
+  test("teacher sets a new student password and the student signs in with it", async ({ page, browser, request }) => {
+    test.setTimeout(240_000);
+    const state = qaState();
+    await login(page, "teacher");
+    await page.goto("/admin/students");
+
+    const list = await page.request.get("/api/admin/students");
+    const students = (await list.json()) as { students: Array<{ id: string; fullName: string; phone: string }> };
+    const target = students.students.find((s) => s.phone === state.phone.student2.phone);
+    expect(target, "student2 must exist").toBeTruthy();
+
+    const newPassword = "Maryam-Quran-7788";
+    const res = await page.request.post(`/api/admin/students/${target!.id}/password`, { data: { password: newPassword } });
+    expect(res.ok()).toBe(true);
+
+    // the UI shows the button and the generated suggestion
+    await page.goto("/admin/students");
+    await expect(page.getByRole("button", { name: "تعيين كلمة مرور" }).first()).toBeVisible();
+
+    // The credential itself works (fast, no cold-start flakiness).
+    const ctx = await browser.newContext({
+      baseURL: process.env.QA_BASE_URL || "https://arabic-lms-staging.up.railway.app",
+      locale: "ar-JO",
+    });
+    const signIn = await request.post("/api/auth/login", {
+      data: { phone: localPhone(state.phone.student2.phone), password: newPassword },
+    });
+    expect(signIn.status()).toBe(200);
+    const payload = (await signIn.json()) as { role?: string; redirect?: string };
+    expect(payload.role).toBe("STUDENT");
+    expect(payload.redirect).toBe("/dashboard");
+
+    // …and the UI form accepts it too.
+    const student = await ctx.newPage();
+    await student.goto("/login");
+    await student.getByLabel("رقم الهاتف").fill(localPhone(state.phone.student2.phone));
+    await student.getByLabel("كلمة المرور").fill(newPassword);
+    await student.getByRole("button", { name: /دخول/ }).click();
+    await expect(student).toHaveURL(/\/dashboard/, { timeout: 90_000 });
+    await ctx.close();
   });
 
   test("staff management creates an assistant who can sign in", async ({ page, browser }) => {
