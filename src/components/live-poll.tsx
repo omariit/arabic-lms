@@ -178,7 +178,7 @@ export function PollResultsCard({
           ✓ أجابت: {answered.map((a) => a.name).join("، ")}
         </p>
       )}
-      <p data-testid="poll-missing" className="mt-1 text-[11px] font-bold text-amber-800">
+      <p data-testid="poll-missing" className="mt-1 text-[11px] font-bold leading-6 text-amber-800">
         {missing.length > 0 ? `⏳ لم تُجب بعد: ${missing.map((m) => m.name).join("، ")}` : "✓ جميع الطالبات أجبن"}
       </p>
     </div>
@@ -190,7 +190,7 @@ export function AttendanceCard({ data, onRefresh, liveId }: { data: AttendanceDa
   return (
     <div data-testid="attendance" className="rounded-2xl border border-brand-100 bg-white p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-sm font-extrabold text-brand-950">🗒 سجل الحضور</p>
+        <p className="text-sm font-extrabold text-brand-950">📋 سجل الحضور</p>
         <div className="flex gap-1.5">
           <Button size="sm" variant="outline" onClick={onRefresh}>تحديث</Button>
           <a href={`/admin/live/${liveId}/report`}>

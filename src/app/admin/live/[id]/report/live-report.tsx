@@ -81,7 +81,7 @@ export function LiveReport({ liveId }: { liveId: string }) {
       <div className="rounded-3xl border border-brand-100 bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <h1 className="text-lg font-extrabold text-brand-950">🗒 تقرير الحصة — {data.live.title}</h1>
+            <h1 className="text-lg font-extrabold text-brand-950">📋 تقرير الحصة — {data.live.title}</h1>
             <p className="mt-1 text-xs text-brand-900/60">
               {data.live.course.title} · بدأت {clock(data.live.startedAt)} · انتهت {clock(data.live.endedAt)}
             </p>
@@ -126,7 +126,7 @@ export function LiveReport({ liveId }: { liveId: string }) {
                     <td className="p-2 font-extrabold text-brand-950">{a.name}</td>
                     <td className="p-2 text-brand-900/70">{clock(a.joinedAt)}</td>
                     <td className="p-2 text-brand-900/70">{a.leftAt ? clock(a.leftAt) : "في الحصة"}</td>
-                    <td className="p-2 text-brand-900/70">{dur(a.seconds)}</td>
+                    <td className="p-2 text-brand-900/70">{a.leftAt ? dur(a.seconds) : "في الحصة"}</td>
                   </tr>
                 ))}
               </tbody>
