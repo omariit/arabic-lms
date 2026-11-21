@@ -89,12 +89,29 @@ async function session(role, phone, viewports) {
       if (r.status() >= 400 && !u.pathname.startsWith("/_next")) problems.push(`${r.status()} ${u.pathname}`);
     });
 
-    await page.goto("/login", { waitUntil: "domcontentloaded" });
-    if (await page.getByLabel("رقم الهاتف", { exact: true }).isVisible().catch(() => false)) {
+    // Cold starts and rate limits are normal here: retry until a real session exists.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await page.goto("/login", { waitUntil: "domcontentloaded" });
+      if (!(await page.getByLabel("رقم الهاتف", { exact: true }).isVisible().catch(() => false))) {
+        const session = await page.evaluate(async () => {
+          const r = await fetch("/api/auth/session", { cache: "no-store" }).catch(() => null);
+          return r && r.ok ? ((await r.json()).user ?? null) : null;
+        });
+        if (session) break;
+      }
       await page.getByLabel("رقم الهاتف", { exact: true }).fill(local(phone));
       await page.getByLabel("كلمة المرور", { exact: true }).fill(state.password);
       await page.getByRole("button", { name: "دخول" }).click();
-      await page.waitForURL(/\/(admin|dashboard)/, { timeout: 90_000 }).catch(() => {});
+      const ok = await page.waitForURL(/\/(admin|dashboard)/, { timeout: 90_000 }).then(() => true).catch(() => false);
+      if (ok) break;
+      const msg = (await page.locator("body").innerText().catch(() => "")).slice(0, 120);
+      console.log(`  login attempt ${attempt + 1} failed: ${msg.replace(/\s+/g, " ")}`);
+      await page.waitForTimeout(20_000);
+    }
+    if (!/\/(admin|dashboard)/.test(page.url())) {
+      console.log("  ⚠ could not sign in — skipping this session");
+      await ctx.close();
+      continue;
     }
 
     for (const route of SCREENS[role]) {

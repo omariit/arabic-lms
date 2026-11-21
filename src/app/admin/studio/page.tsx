@@ -16,7 +16,10 @@ export default async function StudioPage() {
           <p className="text-xs font-extrabold text-amber-600">استوديو التعليم</p>
           <h1 className="text-lg font-extrabold text-brand-950">🎬 تسجيل حصة</h1>
         </div>
-        <Link href="/admin/recordings" className="rounded-xl border border-brand-200 px-3 py-2 text-xs font-bold text-brand-900">
+        <Link
+          href="/admin/recordings"
+          className="inline-flex h-11 items-center gap-1 rounded-xl border-2 border-brand-200 bg-white px-4 text-xs font-extrabold text-brand-900"
+        >
           📼 كل التسجيلات
         </Link>
       </div>
