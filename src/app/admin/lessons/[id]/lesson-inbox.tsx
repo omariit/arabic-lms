@@ -16,12 +16,12 @@ type Msg = { id: string; senderId: string; senderRole: string; body: string; aud
 
 const btn = "rounded-xl px-3 py-2 text-xs font-extrabold transition disabled:opacity-50";
 
-export function LessonInbox({ lesson }: { lesson: Lesson }) {
-  const [tab, setTab] = useState<"assignment" | "inbox">("assignment");
+export function LessonInbox({ lesson, initialStudent }: { lesson: Lesson; initialStudent?: string }) {
+  const [tab, setTab] = useState<"assignment" | "inbox">(initialStudent ? "inbox" : "assignment");
   const [form, setForm] = useState({ description: lesson.description, scriptText: lesson.scriptText, assignmentTitle: lesson.assignmentTitle, assignmentInstructions: lesson.assignmentInstructions });
   const [saved, setSaved] = useState(false);
   const [threads, setThreads] = useState<Thread[]>([]);
-  const [active, setActive] = useState<string | null>(null); // studentId
+  const [active, setActive] = useState<string | null>(initialStudent ?? null); // studentId
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const rec = useAudioRecorder(180);
@@ -45,6 +45,10 @@ export function LessonInbox({ lesson }: { lesson: Lesson }) {
   }, [lesson.id]);
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
+  // Arriving from /admin/inbox?student=… : open that conversation immediately.
+  useEffect(() => {
+    if (initialStudent) void loadMessages(initialStudent);
+  }, [initialStudent, loadMessages]);
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => loadMessages(active), 5000);

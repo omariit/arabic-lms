@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StudentNav } from "@/components/student-nav";
 import { db } from "@/lib/db";
 import { requireStudent } from "@/lib/auth";
 import { ProtectedPlayer } from "@/components/protected-player";
@@ -25,7 +26,8 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
     },
   });
   if (!lesson) {
-    return <main className="mx-auto max-w-3xl px-4 py-16 text-center">الدرس غير موجود</main>;
+    return <main className="mx-auto max-w-3xl px-4 py-16 text-center">
+      <StudentNav />الدرس غير موجود</main>;
   }
 
   const enrollment = await db.enrollment.findFirst({

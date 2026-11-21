@@ -30,16 +30,20 @@ export async function login(page: Page, key: keyof QaState["phone"]) {
     await page.goto("/login");
 
     // Already signed in (a retry, or a session left by a previous step): the login
-    // form is not rendered at all, so go straight to the right home page.
+    // form is not rendered at all. Only short-circuit when it is the SAME account;
+    // otherwise sign the other user out first (one session per device).
     if (!(await page.getByLabel("رقم الهاتف").isVisible().catch(() => false))) {
-      const role = await page.evaluate(async () => {
+      const session = await page.evaluate(async () => {
         const res = await fetch("/api/auth/session", { cache: "no-store" }).catch(() => null);
         const data = res && res.ok ? await res.json().catch(() => null) : null;
-        return (data as { user?: { role?: string } } | null)?.user?.role ?? null;
+        return (data as { user?: { role?: string; phone?: string } } | null)?.user ?? null;
       });
-      if (role) {
-        await page.goto(role === "STUDENT" ? "/dashboard" : "/admin", { waitUntil: "domcontentloaded" });
+      if (session?.phone === acc.phone) {
+        await page.goto(session.role === "STUDENT" ? "/dashboard" : "/admin", { waitUntil: "domcontentloaded" });
         return;
+      }
+      if (session) {
+        await page.request.post("/api/auth/logout").catch(() => {});
       }
       await page.goto("/login");
     }

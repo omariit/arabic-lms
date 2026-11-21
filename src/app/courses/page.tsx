@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StudentNav } from "@/components/student-nav";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { viewerCountry, currencyFor } from "@/lib/pricing";
@@ -56,6 +57,7 @@ export default async function CoursesPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
+      <StudentNav />
       <header className="mb-8 text-center">
         <h1 className="text-2xl font-extrabold text-brand-900 sm:text-3xl">الدورات المتاحة</h1>
         <p className="mt-2 text-sm text-gray-600">

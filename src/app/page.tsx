@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -13,6 +14,13 @@ import { cn } from "@/lib/utils";
 import { LandingFallback } from "./landing-fallback";
 
 export const dynamic = "force-dynamic";
+
+/** The marketing page belongs to visitors. A signed-in user goes to her own
+ * dashboard instead of being sent back to the landing page by the logo or the
+ * browser's back button. Staff can still preview it with `?preview=1`. */
+function homeFor(role: string) {
+  return role === "STUDENT" ? "/dashboard" : "/admin";
+}
 
 type LandingData = {
   profile: {
@@ -85,7 +93,17 @@ const LEVEL_ICONS = ["📖", "🌙", "📜"];
 const FEATURE_ICONS = ["🔴", "🎧", "🛡️", "📝", "📲", "🏆"];
 
 /** Public landing page — sanad-inspired structure, fully CMS-managed. */
-export default async function LandingPage() {
+export default async function LandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  if (!params.preview) {
+    const current = await getCurrentUser().catch(() => null);
+    if (current) redirect(homeFor(current.role));
+  }
+
   const [{ locale, profile, courses, testimonials, totalStudents, viewerCountry }, site] = await Promise.all([
     loadLanding(),
     getSiteData(),

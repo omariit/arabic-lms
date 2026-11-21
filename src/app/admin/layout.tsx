@@ -6,13 +6,14 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { LogoutButton } from "@/components/logout-button";
 
 const NAV = [
-  { href: "/admin/chat", label: "الرسائل", icon: "📨", staff: true, badge: true },
+  { href: "/admin/chat", label: "الرسائل", icon: "📨", staff: true, badge: "chat" },
+  { href: "/admin/inbox", label: "الواجبات", icon: "📥", staff: true, badge: "homework" },
   { href: "/admin", label: "الرئيسية", icon: "🏠", teacher: true },
   { href: "/admin/studio", label: "استوديو التسجيل", icon: "🎬", teacher: true },
-  { href: "/admin/recordings", label: "التسجيلات", icon: "📼", teacher: true },
+  { href: "/admin/recordings", label: "تسجيلات الحصص", icon: "📼", teacher: true },
   { href: "/admin/live", label: "الحصص المباشرة", icon: "🔴", teacher: true },
   { href: "/admin/grading", label: "التصحيح", icon: "🎤", teacher: true },
-  { href: "/admin/enrollments", label: "التسجيلات", icon: "✅", teacher: true },
+  { href: "/admin/enrollments", label: "طلبات الانتساب", icon: "✅", teacher: true },
   { href: "/admin/landing", label: "الصفحة", icon: "🎨", teacher: true },
   { href: "/admin/staff", label: "فريقي", icon: "🤝", teacher: true },
   { href: "/admin/students", label: "المستخدمات", icon: "👩‍🎓", adminOnly: true },
@@ -29,12 +30,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const isAssistant = user.role === "ASSISTANT";
 
   let chatUnread = 0;
+  let homeworkUnread = 0;
   try {
     const [chats, lessons] = await Promise.all([
       db.conversation.count({ where: { staffUnread: { gt: 0 } } }),
       db.lessonThread.count({ where: { staffUnread: { gt: 0 } } }),
     ]);
-    chatUnread = chats + lessons;
+    chatUnread = chats;
+    homeworkUnread = lessons;
   } catch { /* cold start */ }
 
   const nav = NAV.filter((n) => {
@@ -68,11 +71,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link key={n.href} href={n.href} className="relative flex flex-col items-center gap-0.5 py-3 text-[11px] font-bold text-brand-900 hover:bg-brand-50">
               <span className="text-xl">{n.icon}</span>
               {n.label}
-              {n.badge && chatUnread > 0 && (
-                <span className="absolute right-3 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-emerald-950">
-                  {chatUnread > 9 ? "٩+" : chatUnread.toLocaleString("ar-EG")}
-                </span>
-              )}
+              {(() => {
+                const count = n.badge === "homework" ? homeworkUnread : n.badge === "chat" ? chatUnread : 0;
+                if (!count) return null;
+                return (
+                  <span className="absolute right-3 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-emerald-950">
+                    {count > 9 ? "٩+" : count.toLocaleString("ar-EG")}
+                  </span>
+                );
+              })()}
             </Link>
           ))}
         </div>

@@ -65,6 +65,7 @@ export function RecordingsClient({ isAdmin }: { isAdmin: boolean }) {
   }, []);
 
   const act = async (id: string, action: "finalize" | "abort" | "delete") => {
+    if (action === "delete" && !window.confirm("حذف هذا التسجيل نهائيًا؟ لا يمكن التراجع.")) return;
     setBusy(id); setNotice("");
     try {
       const res = await fetch(`/api/admin/recordings/${id}${action === "delete" ? "" : `/${action}`}`, {
@@ -119,15 +120,33 @@ export function RecordingsClient({ isAdmin }: { isAdmin: boolean }) {
       )}
       {notice && <p className="rounded-xl bg-brand-50 p-3 text-sm font-bold text-brand-800">{notice}</p>}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-lg font-extrabold text-brand-950">📼 تسجيلات الحصص {isAdmin && <span className="text-xs font-bold text-gray-400">(كل المعلمات)</span>}</h1>
-        <Link href="/admin/studio"><Button size="sm">🎬 تسجيل جديد</Button></Link>
+        <div className="ms-auto flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => void load()}>🔄 تحديث</Button>
+          <Link href="/admin/studio"><Button size="sm">🎬 تسجيل جديد</Button></Link>
+        </div>
       </div>
 
       {data.recordings.length === 0 ? (
-        <Card><CardContent className="py-10 text-center text-sm text-gray-500">
-          لا تسجيلات بعد — افتحي «استوديو التعليم» وسجّلي أول حصة.
-        </CardContent></Card>
+        <Card>
+          <CardContent className="space-y-3 py-10 text-center text-sm text-gray-600">
+            <p className="text-4xl">🎬</p>
+            <p className="font-extrabold text-brand-950">لا تسجيلات بعد</p>
+            <p>
+              التسجيل يبدأ من <strong>استوديو التعليم</strong>: تختارين الدرس، تضغطين «بدء التسجيل»،
+              وعند «إنهاء» يظهر الفيديو هنا ويُربط بالدرس تلقائيًا.
+            </p>
+            <p className="text-xs text-gray-500">
+              سجّلتِ ولم يظهر شيء؟ اضغطي <strong>تحديث</strong> — التسجيل يحتاج بضع ثوانٍ بعد الإنهاء،
+              وإن فشل يظهر هنا بحالة «فشل» مع السبب.
+            </p>
+            <div className="flex justify-center gap-2">
+              <Link href="/admin/studio"><Button size="sm">فتح الاستوديو</Button></Link>
+              <Button size="sm" variant="outline" onClick={() => void load()}>تحديث الآن</Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         data.recordings.map((r) => {
           const status = STATUS[r.status] ?? { label: r.status, tone: "gray" as const };

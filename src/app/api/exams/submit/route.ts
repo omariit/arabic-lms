@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { apiUser } from "@/lib/auth";
 import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { normaliseOrder, toOriginalIndex } from "@/lib/exam-order";
 
 /** Submit MCQ answers: auto-grading happens here with correctIndex never exposed. */
 export async function POST(req: Request) {
@@ -25,10 +26,19 @@ export async function POST(req: Request) {
   if (attempt.userId !== user.id) return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
   if (attempt.status !== "IN_PROGRESS") return NextResponse.json({ error: "تم الإرسال مسبقًا" }, { status: 409 });
 
+  // Answers arrive as PRESENTED option indexes; convert to ORIGINAL indexes so
+  // grading (and any later shuffle toggle) stays correct.
+  const order = normaliseOrder(attempt.questionOrder, attempt.exam.questions);
+  const normalised: Record<string, number> = {};
+  for (const [qid, presented] of Object.entries(answers)) {
+    const original = toOriginalIndex(order, qid, Number(presented));
+    if (original !== null) normalised[qid] = original;
+  }
+
   // Auto-grade on the server.
   let correct = 0;
   for (const q of attempt.exam.questions) {
-    if (answers[q.id] === q.correctIndex) correct++;
+    if (normalised[q.id] === q.correctIndex) correct++;
   }
   const total = Math.max(1, attempt.exam.questions.length);
   const autoScore = Math.round((correct / total) * attempt.exam.maxGrade);
@@ -37,7 +47,7 @@ export async function POST(req: Request) {
     where: { id: attemptId },
     data: {
       status: "SUBMITTED",
-      answers: answers as object,
+      answers: normalised as object,
       autoScore,
       submittedAt: new Date(),
     },
@@ -49,7 +59,7 @@ export async function POST(req: Request) {
     text: q.text,
     options: q.options as string[],
     correctIndex: q.correctIndex,
-    selected: answers[q.id] ?? null,
+    selected: normalised[q.id] ?? null,
   }));
 
   return NextResponse.json({ attempt: updated, score: autoScore, maxGrade: attempt.exam.maxGrade, review });

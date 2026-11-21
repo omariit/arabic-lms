@@ -382,6 +382,10 @@ model Exam {
   durationMin Int      @default(15) // countdown for MCQ; max duration for VOICE
   maxGrade    Int      @default(100)
   published   Boolean  @default(false)
+  // Randomisation requested by the teacher: a different order for every student,
+  // while the stored order keeps grading and review consistent.
+  shuffleQuestions Boolean @default(false)
+  shuffleOptions   Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -422,7 +426,9 @@ model ExamAttempt {
   userId     String
   examId     String
   status     AttemptStatus @default(IN_PROGRESS)
-  answers    Json? // questionId -> selected index (MCQ)
+  answers    Json? // questionId -> ORIGINAL option index (MCQ)
+  // The exact order shown to this student: { q: [questionId…], o: { questionId: [optionIndex…] } }
+  questionOrder Json?
   autoScore  Int? // auto-graded score (MCQ)
   manualGrade Int? // teacher grade (VOICE + override)
   feedbackText String? // teacher text notes

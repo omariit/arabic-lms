@@ -164,7 +164,8 @@ ${marker}
 **حتى الإجازة**`);
     await page.getByRole("button", { name: /حفظ التغييرات/ }).click();
     await expect(page.getByRole("button", { name: /تم الحفظ/ })).toBeVisible({ timeout: 30_000 });
-    await page.goto("/");
+    // Signed-in staff are redirected off the landing page, so preview explicitly.
+    await page.goto("/?preview=1");
     await expect(page.locator("body")).toContainText(marker, { timeout: 30_000 });
   });
 

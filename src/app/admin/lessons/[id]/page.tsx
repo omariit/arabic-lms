@@ -3,9 +3,17 @@ import { requireTeacher } from "@/lib/auth";
 import { LessonInbox } from "./lesson-inbox";
 
 /** Staff lesson workspace: assignment editor + every student's private thread. */
-export default async function AdminLessonPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminLessonPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireTeacher();
   const { id } = await params;
+  const sp = await searchParams;
+  const initialStudent = typeof sp.student === "string" ? sp.student : undefined;
   const lesson = await db.lesson.findUnique({
     where: { id },
     select: {
@@ -19,6 +27,7 @@ export default async function AdminLessonPage({ params }: { params: Promise<{ id
   }
   return (
     <LessonInbox
+      initialStudent={initialStudent}
       lesson={{
         id: lesson.id,
         title: lesson.title,

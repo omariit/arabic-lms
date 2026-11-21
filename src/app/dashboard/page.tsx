@@ -26,7 +26,7 @@ export default async function StudentDashboard() {
     where: { studentId: user.id, studentUnread: { gt: 0 } },
   }).catch(() => 0);
 
-  const [enrollments, liveSessions, attempts] = await Promise.all([
+  const [enrollments, liveSessions, attempts, pendingRequests, openCourses] = await Promise.all([
     db.enrollment.findMany({
       where: { userId: user.id, status: "ACTIVE" },
       include: {
@@ -51,6 +51,23 @@ export default async function StudentDashboard() {
       },
       orderBy: { submittedAt: "desc" },
       take: 5,
+    }),
+    // Requests she already sent and that we have not decided yet: she must be
+    // able to see them instead of wondering whether the request went through.
+    db.enrollmentRequest.findMany({
+      where: { userId: user.id, status: "PENDING" },
+      include: { course: { select: { id: true, title: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    // Courses she can still join (for the empty state and the "suggested" row).
+    db.course.findMany({
+      where: {
+        published: true,
+        enrollments: { none: { userId: user.id, status: "ACTIVE" } },
+      },
+      select: { id: true, title: true, level: true, coverColor: true },
+      orderBy: { createdAt: "desc" },
+      take: 4,
     }),
   ]);
 
@@ -124,9 +141,19 @@ export default async function StudentDashboard() {
       <section id="courses" className="mb-8 scroll-mt-6">
         <h2 className="mb-3 text-lg font-extrabold">📚 دوراتي</h2>
         {enrollments.length === 0 ? (
-          <Card><CardContent className="text-center text-gray-500">
-            لا توجد دورات بعد — تصفّحي <Link href="/" className="font-bold text-brand-600 underline">الدورات المتاحة</Link>
-          </CardContent></Card>
+          <Card>
+            <CardContent className="space-y-3 text-center">
+              <p className="text-3xl">🌱</p>
+              <p className="font-extrabold">لم تسجّلي في أي مقرر بعد</p>
+              <p className="text-sm text-gray-500">
+                اختاري المقرر المناسب، أرسلي طلب الانتساب ورقم الحوالة، وسيُفتح لك مباشرة بعد موافقة المعلمة.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Link href="/courses" className={cn(buttonVariants())}>تصفّح المقررات المتاحة</Link>
+                <Link href="/dashboard/chat" className={cn(buttonVariants({ variant: "secondary" }))}>اسألي المعلمة</Link>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
           <div className="space-y-3">
             {enrollments.map((e) => (
@@ -156,6 +183,41 @@ export default async function StudentDashboard() {
           </div>
         )}
       </section>
+
+      {/* Pending enrollment requests: visible so nothing feels lost */}
+      {pendingRequests.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-lg font-extrabold">⏳ طلبات قيد المراجعة</h2>
+          <div className="space-y-2">
+            {pendingRequests.map((r) => (
+              <Card key={r.id}>
+                <CardContent className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-bold">{r.course.title}</p>
+                    <p className="text-xs text-gray-500">أُرسل {formatDateAr(r.createdAt)} — بانتظار تأكيد المعلمة</p>
+                  </div>
+                  <Badge tone="amber">قيد المراجعة</Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Suggested courses when her list is short */}
+      {openCourses.length > 0 && enrollments.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-lg font-extrabold">✨ مقررات متاحة لك</h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {openCourses.map((c) => (
+              <Link key={c.id} href={`/courses/${c.id}`} className="rounded-2xl border border-brand-100 bg-white p-4 shadow-sm transition hover:border-brand-300">
+                <p className="font-bold">{c.title}</p>
+                <p className="text-xs text-gray-500">{c.level} · اعرضي المقرر واطلبي الانتساب</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Recent results */}
       {attempts.length > 0 && (
