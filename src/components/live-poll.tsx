@@ -29,10 +29,10 @@ export type AttendanceData = {
 };
 
 const fmtSeconds = (s: number) => {
+  if (s < 60) return `${s} ث`;
   const m = Math.floor(s / 60);
-  const r = s % 60;
   if (m >= 60) return `${Math.floor(m / 60)} س ${m % 60} د`;
-  return `${m}:${String(r).padStart(2, "0")}`;
+  return `${m} د`;
 };
 
 const fmtClock = (iso: string) =>

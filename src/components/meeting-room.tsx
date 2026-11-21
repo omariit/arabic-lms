@@ -842,81 +842,6 @@ export function MeetingRoom({
         )}
       </div>
 
-      {isHost && inviteUrl && (
-        <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-3">
-          <p className="text-xs font-extrabold text-brand-900">🔗 دعوة عامة لغير المسجّلات</p>
-          <div className="mt-1.5 flex gap-2">
-            <input readOnly value={inviteUrl} dir="ltr" className="min-w-0 flex-1 rounded-xl border border-brand-200 bg-white px-2 py-1.5 text-[11px]" />
-            <Button size="sm" onClick={() => { navigator.clipboard.writeText(inviteUrl); flash("تم نسخ رابط الدعوة ✓"); }}>نسخ</Button>
-            <a href={`https://wa.me/?text=${encodeURIComponent(`دعوة لحضور حصة «${title}»: ${inviteUrl}`)}`} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" className="bg-[#25D366] hover:bg-[#1ebe57]">واتساب</Button>
-            </a>
-          </div>
-          <p className="mt-1 text-[10px] text-brand-900/55">من لديها الرابط تدخل باسمها دون تسجيل، وبانتظار موافقتك قبل الدخول.</p>
-        </div>
-      )}
-
-      {/* participants + moderation */}
-      {(showParticipants || isHost) && (
-        <div className="rounded-2xl border border-brand-100 bg-white p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-extrabold text-brand-950">👥 المشاركات ({roster.length})</p>
-            {isHost && <span className="text-[10px] font-bold text-brand-700">لديك صلاحيات الإدارة</span>}
-          </div>
-
-          {isHost && waitingList.length > 0 && (
-            <div className="mb-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-2.5">
-              <p className="text-xs font-extrabold text-amber-900">🚪 طلبات دخول ({waitingList.length})</p>
-              {waitingList.map((w) => (
-                <div key={w.socketId} className="mt-1.5 flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-amber-900">{w.name}</span>
-                  <span className="flex gap-1.5">
-                    <Button size="sm" variant="success" onClick={() => control("admit", w.socketId)}>قبول</Button>
-                    <Button size="sm" variant="outline" onClick={() => control("deny", w.socketId)}>رفض</Button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <ul className="space-y-1.5">
-            {roster.map((p) => (
-              <li key={p.socketId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand-50 px-3 py-2">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-extrabold text-brand-950">
-                    {p.name} {p.socketId === selfId && <span className="text-[10px] text-brand-700">(أنت)</span>}
-                    {p.isHost && <span className="ms-1 text-[10px] font-bold text-amber-700">👑 المعلمة</span>}
-                    {p.role === "GUEST" && <span className="ms-1 text-[10px] font-bold text-brand-600">ضيفة</span>}
-                  </p>
-                  <p className="text-[10px] text-brand-900/50">
-                    {p.micOn ? "🎙 تتحدث" : p.micAllowed ? "🎙 مسموح" : "🔇 مكتومة"} ·{" "}
-                    {p.camOn ? "📷 كاميرا" : "📷 مغلقة"} · {p.screenOn ? "🖥 تشارك" : ""}
-                    {p.handRaised && " · ✋ رافعة يدها"}
-                  </p>
-                </div>
-                {isHost && p.socketId !== selfId && (
-                  <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="outline" onClick={() => control(p.micAllowed ? "mute-mic" : "allow-mic", p.socketId)}>
-                      {p.micAllowed ? "إسكات" : "سماح بالمايك"}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => control(p.camAllowed ? "stop-cam" : "allow-cam", p.socketId)}>
-                      {p.camAllowed ? "إيقاف الكاميرا" : "سماح بالكاميرا"}
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => control("spotlight", undefined, p.socketId === spotlight ? "" : p.socketId)}>
-                      {spotlight === p.socketId ? "إلغاء التثبيت" : "تثبيت"}
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => { if (confirm(`إخراج ${p.name} من الحصة؟`)) control("kick", p.socketId); }}>
-                      إخراج
-                    </Button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-
       {isHost && composerOpen && (
         <div data-testid="poll-composer" className="rounded-2xl border-2 border-brand-300 bg-white p-3">
           <p className="mb-2 text-sm font-extrabold text-brand-950">❓ سؤال للحاضرات</p>
@@ -991,6 +916,81 @@ export function MeetingRoom({
           </div>
         </div>
       )}
+
+      {isHost && inviteUrl && (
+        <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-3">
+          <p className="text-xs font-extrabold text-brand-900">🔗 دعوة عامة لغير المسجّلات</p>
+          <div className="mt-1.5 flex gap-2">
+            <input readOnly value={inviteUrl} dir="ltr" className="min-w-0 flex-1 rounded-xl border border-brand-200 bg-white px-2 py-1.5 text-[11px]" />
+            <Button size="sm" onClick={() => { navigator.clipboard.writeText(inviteUrl); flash("تم نسخ رابط الدعوة ✓"); }}>نسخ</Button>
+            <a href={`https://wa.me/?text=${encodeURIComponent(`دعوة لحضور حصة «${title}»: ${inviteUrl}`)}`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" className="bg-[#25D366] hover:bg-[#1ebe57]">واتساب</Button>
+            </a>
+          </div>
+          <p className="mt-1 text-[10px] text-brand-900/55">من لديها الرابط تدخل باسمها دون تسجيل، وبانتظار موافقتك قبل الدخول.</p>
+        </div>
+      )}
+
+      {/* participants + moderation */}
+      {(showParticipants || isHost) && (
+        <div className="rounded-2xl border border-brand-100 bg-white p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-extrabold text-brand-950">👥 المشاركات ({roster.length})</p>
+            {isHost && <span className="text-[10px] font-bold text-brand-700">لديك صلاحيات الإدارة</span>}
+          </div>
+
+          {isHost && waitingList.length > 0 && (
+            <div className="mb-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-2.5">
+              <p className="text-xs font-extrabold text-amber-900">🚪 طلبات دخول ({waitingList.length})</p>
+              {waitingList.map((w) => (
+                <div key={w.socketId} className="mt-1.5 flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-amber-900">{w.name}</span>
+                  <span className="flex gap-1.5">
+                    <Button size="sm" variant="success" onClick={() => control("admit", w.socketId)}>قبول</Button>
+                    <Button size="sm" variant="outline" onClick={() => control("deny", w.socketId)}>رفض</Button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <ul className="space-y-1.5">
+            {roster.map((p) => (
+              <li key={p.socketId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand-50 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-extrabold text-brand-950">
+                    {p.name} {p.socketId === selfId && <span className="text-[10px] text-brand-700">(أنت)</span>}
+                    {p.isHost && <span className="ms-1 text-[10px] font-bold text-amber-700">👑 المعلمة</span>}
+                    {p.role === "GUEST" && <span className="ms-1 text-[10px] font-bold text-brand-600">ضيفة</span>}
+                  </p>
+                  <p className="text-[10px] text-brand-900/50">
+                    {p.micOn ? "🎙 تتحدث" : p.micAllowed ? "🎙 مسموح" : "🔇 مكتومة"} ·{" "}
+                    {p.camOn ? "📷 كاميرا" : "📷 مغلقة"} · {p.screenOn ? "🖥 تشارك" : ""}
+                    {p.handRaised && " · ✋ رافعة يدها"}
+                  </p>
+                </div>
+                {isHost && p.socketId !== selfId && (
+                  <div className="flex flex-wrap gap-1">
+                    <Button size="sm" variant="outline" onClick={() => control(p.micAllowed ? "mute-mic" : "allow-mic", p.socketId)}>
+                      {p.micAllowed ? "إسكات" : "سماح بالمايك"}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => control(p.camAllowed ? "stop-cam" : "allow-cam", p.socketId)}>
+                      {p.camAllowed ? "إيقاف الكاميرا" : "سماح بالكاميرا"}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => control("spotlight", undefined, p.socketId === spotlight ? "" : p.socketId)}>
+                      {spotlight === p.socketId ? "إلغاء التثبيت" : "تثبيت"}
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => { if (confirm(`إخراج ${p.name} من الحصة؟`)) control("kick", p.socketId); }}>
+                      إخراج
+                    </Button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
 
       {isHost && (
         <AttendanceCard data={attendance} onRefresh={refreshAttendance} liveId={liveId} />

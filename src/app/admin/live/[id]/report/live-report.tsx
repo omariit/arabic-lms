@@ -28,6 +28,7 @@ const clock = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("ar-JO", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 const dur = (s: number) => {
+  if (s < 60) return "أقل من دقيقة";
   const m = Math.floor(s / 60);
   return m >= 60 ? `${Math.floor(m / 60)} س ${m % 60} د` : `${m} د`;
 };
