@@ -44,8 +44,8 @@ export async function login(page: Page, key: keyof QaState["phone"]) {
       await page.goto("/login");
     }
 
-    await page.getByLabel("رقم الهاتف").fill(localPhone(acc.phone));
-    await page.getByLabel("كلمة المرور").fill(state.password);
+    await page.getByLabel("رقم الهاتف", { exact: true }).fill(localPhone(acc.phone));
+    await page.getByLabel("كلمة المرور", { exact: true }).fill(state.password);
 
     const loginResponse = page
       .waitForResponse((r) => r.url().includes("/api/auth/login") && r.request().method() === "POST", { timeout: 90_000 })

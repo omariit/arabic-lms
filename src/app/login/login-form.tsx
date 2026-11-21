@@ -8,7 +8,13 @@ import { Card, CardContent, Input, Label, Select } from "@/components/ui/primiti
 import { COUNTRIES } from "@/lib/phone";
 import { LangSwitcher } from "@/components/lang-switcher";
 
-export function LoginForm({ supportWhatsapp = "" }: { supportWhatsapp?: string }) {
+export function LoginForm({
+  supportWhatsapp = "",
+  stagingBanner = false,
+}: {
+  supportWhatsapp?: string;
+  stagingBanner?: boolean;
+}) {
   const [country, setCountry] = useState("JO");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -18,6 +24,9 @@ export function LoginForm({ supportWhatsapp = "" }: { supportWhatsapp?: string }
   // A tap that lands before React hydrates used to submit the raw form (empty
   // fields, or a GET that put the password in the URL). Gate the button instead.
   const [hydrated, setHydrated] = useState(false);
+  // Showing the password prevents the most common real-world failure: an Arabic
+  // keyboard layout or an unseen trailing space producing a "wrong password".
+  const [showPassword, setShowPassword] = useState(false);
 
   // Arriving from a dead session (SessionGuard redirect or ?expired=1).
   useEffect(() => {
@@ -59,6 +68,11 @@ export function LoginForm({ supportWhatsapp = "" }: { supportWhatsapp?: string }
         <CardContent className="w-full min-w-0 p-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="مُقْرِئَة" className="mx-auto mb-4 h-20 w-auto" />
+          {stagingBanner && (
+            <p className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-center text-[11px] font-bold text-amber-900">
+              بيئة تجريبية (Staging) — الحسابات هنا ليست حسابات الموقع الحقيقي
+            </p>
+          )}
           <h1 className="mb-1 text-center text-2xl font-extrabold">تسجيل الدخول</h1>
           <p className="mb-6 text-center text-sm text-gray-500">بالهاتف وكلمة المرور — جلسة على جهاز واحد فقط</p>
           <form
@@ -91,15 +105,31 @@ export function LoginForm({ supportWhatsapp = "" }: { supportWhatsapp?: string }
               </div>
             </div>
             <div>
-              <Label htmlFor="password">كلمة المرور</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">كلمة المرور</Label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="mb-1 text-[11px] font-bold text-brand-600 underline"
+                  aria-label={showPassword ? "إخفاء الحقل" : "إظهار الحقل"}
+                >
+                  {showPassword ? "إخفاء" : "إظهار"}
+                </button>
+              </div>
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
+                dir="ltr"
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              {password !== password.trim() && (
+                <p className="mt-1 text-[11px] font-bold text-amber-700">
+                  في كلمة المرور مسافة في البداية أو النهاية — لن تُحتسب عند التحقق.
+                </p>
+              )}
             </div>
             {expired && !error && (
               <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">

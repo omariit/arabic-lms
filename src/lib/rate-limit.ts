@@ -28,9 +28,26 @@ export function rateLimit(key: string, limit: number, windowMs: number): { ok: b
   return { ok: true, retryAfter: 0 };
 }
 
-export function rateLimitResponse(retryAfter: number) {
+/** Hits still allowed in the current window (no increment). */
+export function rateLimitPeek(key: string, limit: number, windowMs: number): { remaining: number; retryAfter: number } {
+  const now = Date.now();
+  const bucket = buckets.get(key);
+  if (!bucket) return { remaining: limit, retryAfter: 0 };
+  const hits = bucket.hits.filter((t) => now - t < windowMs);
+  bucket.hits = hits;
+  if (hits.length < limit) return { remaining: limit - hits.length, retryAfter: 0 };
+  return { remaining: 0, retryAfter: Math.ceil((windowMs - (now - hits[0])) / 1000) };
+}
+
+/** Clear a bucket — used after a successful login so a legit user never locks out. */
+export function rateLimitReset(key: string) {
+  buckets.delete(key);
+}
+
+export function rateLimitResponse(retryAfter: number, message?: string) {
+  const seconds = Math.max(1, retryAfter);
   return Response.json(
-    { error: "محاولات كثيرة جدًا، يرجى المحاولة لاحقًا" },
-    { status: 429, headers: { "Retry-After": String(retryAfter) } }
+    { error: message ?? `محاولات كثيرة جدًا — حاولي بعد ${seconds} ثانية`, retryAfter: seconds },
+    { status: 429, headers: { "Retry-After": String(seconds) } }
   );
 }
