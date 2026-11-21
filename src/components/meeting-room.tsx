@@ -106,7 +106,7 @@ export function MeetingRoom({
 
   // ── in-lecture questions + attendance ──
   const [poll, setPoll] = useState<ActivePoll | null>(null);
-  const [answered, setAnswered] = useState<{ optionIndex: number; correct: boolean | null } | null>(null);
+  const [answered, setAnswered] = useState<{ optionIndex: number; correct: boolean | null; correctIndex?: number | null } | null>(null);
   const [progress, setProgress] = useState<PollProgress | null>(null);
   const [attendance, setAttendance] = useState<AttendanceData | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -430,7 +430,7 @@ export function MeetingRoom({
         flash(a.error);
         return;
       }
-      setAnswered({ optionIndex: a.optionIndex ?? 0, correct: a.correct ?? null });
+      setAnswered({ optionIndex: a.optionIndex ?? 0, correct: a.correct ?? null, correctIndex: a.correctIndex ?? null });
       if (a.counts) setPoll((cur) => (cur && cur.id === a.pollId ? { ...cur, counts: a.counts! } : cur));
     });
     socket.on("meet:poll-closed", ({ pollId, correctIndex: ci, counts }: { pollId: string; correctIndex: number | null; counts: number[] }) => {

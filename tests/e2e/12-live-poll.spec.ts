@@ -86,6 +86,22 @@ test.describe("live lecture: questions + attendance", () => {
     await expect(student.getByTestId("live-poll")).toContainText(/انتهى السؤال/, { timeout: 60_000 });
     await expect(student.getByTestId("live-poll")).toContainText(/ستة/, { timeout: 60_000 });
 
+    // ── a second question: a wrong answer still gets the right one, at once ──
+    await page.getByTestId("poll-open").click();
+    await page.getByTestId("poll-question-input").fill("أين يقع طرف اللسان مع النون؟");
+    const opts2 = page.getByTestId("poll-option-input");
+    await opts2.nth(0).fill("أقصى اللسان");
+    await opts2.nth(1).fill("طرف اللسان");
+    await page.getByTestId("poll-correct").selectOption("1");
+    await page.getByTestId("poll-duration").selectOption("0"); // the teacher closes it herself
+    await page.getByTestId("poll-send").click();
+
+    await expect(student.getByTestId("live-poll")).toContainText("أين يقع طرف اللسان مع النون؟", { timeout: 60_000 });
+    await student.getByTestId("poll-option").nth(0).click(); // wrong on purpose
+    await expect(student.getByTestId("poll-answered")).toContainText("الإجابة الصحيحة: طرف اللسان", { timeout: 60_000 });
+    await page.getByTestId("poll-close").click();
+    await expect(student.getByTestId("live-poll")).toContainText(/انتهى السؤال/, { timeout: 60_000 });
+
     // ── attendance of this lecture, live and afterwards ──
     await page.getByTestId("attendance").getByRole("button", { name: "تحديث" }).click();
     await expect(page.getByTestId("attendance")).toContainText(s1, { timeout: 60_000 });
@@ -93,10 +109,13 @@ test.describe("live lecture: questions + attendance", () => {
     await page.goto(`/admin/live/${liveId}/report`);
     await expect(page.locator("h1")).toContainText("تقرير الحصة", { timeout: 60_000 });
     await expect(page.locator("table")).toContainText(s1, { timeout: 60_000 });
-    await expect(page.getByTestId("report-poll")).toHaveCount(1);
-    await expect(page.getByTestId("report-poll")).toContainText("كم عدد حروف الإظهار الحلقي؟");
-    await expect(page.getByTestId("report-poll")).toContainText(s1);
-    await expect(page.getByTestId("report-poll-missing")).toContainText(/لم تُجب/);
+    await expect(page.getByTestId("report-poll")).toHaveCount(2);
+    await expect(page.getByTestId("report-poll").first()).toContainText("كم عدد حروف الإظهار الحلقي؟");
+    await expect(page.getByTestId("report-poll").first()).toContainText(s1);
+    await expect(page.getByTestId("report-poll").nth(1)).toContainText("أين يقع طرف اللسان مع النون؟");
+    // the wrong answer is kept as wrong in the record, with the right one beside it
+    await expect(page.getByTestId("report-poll").nth(1)).toContainText("طرف اللسان");
+    await expect(page.getByTestId("report-poll-missing").first()).toContainText(/لم تُجب/);
 
     // tidy up: end the lecture so the next run starts clean
     await ctx.close();

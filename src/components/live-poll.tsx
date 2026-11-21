@@ -48,12 +48,14 @@ export function LivePollCard({
 }: {
   poll: ActivePoll;
   secondsLeft: number | null;
-  answered: { optionIndex: number; correct: boolean | null } | null;
+  answered: { optionIndex: number; correct: boolean | null; correctIndex?: number | null } | null;
   isHost: boolean;
   onAnswer: (index: number) => void;
 }) {
   const total = poll.counts.reduce((a, b) => a + b, 0);
   const revealed = answered !== null || !poll.open;
+  // The right answer arrives with her own result (before the teacher closes the question).
+  const rightIndex = poll.correctIndex ?? answered?.correctIndex ?? null;
 
   return (
     <div
@@ -78,7 +80,7 @@ export function LivePollCard({
       <div className="space-y-1.5">
         {poll.options.map((opt, i) => {
           const mine = answered?.optionIndex === i;
-          const isCorrect = revealed && poll.correctIndex === i;
+          const isCorrect = revealed && rightIndex === i;
           return (
             <button
               key={i}
@@ -120,7 +122,7 @@ export function LivePollCard({
             ? "✓ وصلت إجابتك للمعلمة"
             : answered.correct
               ? "✓ إجابة صحيحة، أحسنتِ"
-              : `✗ الإجابة الصحيحة: ${poll.correctIndex !== null ? poll.options[poll.correctIndex] : "—"}`}
+              : `✗ الإجابة الصحيحة: ${rightIndex !== null ? poll.options[rightIndex] : "—"}`}
         </p>
       ) : poll.open && !isHost ? (
         <p className="mt-2 text-center text-[10px] text-brand-900/50">اختاري إجابة واحدة — تُرسل مباشرة للمعلمة</p>
