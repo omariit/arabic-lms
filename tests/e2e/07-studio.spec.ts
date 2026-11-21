@@ -23,6 +23,14 @@ test.describe("teaching studio recording", () => {
       if (rec.courseId === courseId) await page.request.delete(`/api/admin/recordings/${rec.id}`);
     }
 
+    // Scale-to-zero: the service may be asleep, so prove the warm-up endpoint
+    // really does wait for it before any recording is attempted.
+    const warm = await page.request.post("/api/admin/recordings/warm");
+    expect(warm.status()).toBe(200);
+    const warmBody = (await warm.json()) as { awake: boolean; ms: number };
+    expect(warmBody.awake).toBe(true);
+    console.log(`recording service warm in ${warmBody.ms}ms${warmBody.ms > 1500 ? " (was asleep)" : " (already awake)"}`);
+
     await page.goto("/admin/studio");
 
     await expect(page.locator("body")).toContainText(/تسجيل حصة/);

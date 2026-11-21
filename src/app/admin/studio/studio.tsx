@@ -71,6 +71,9 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
   const [preview, setPreview] = useState<MediaStream | null>(null);
   const [recoverable, setRecoverable] = useState<{ id: string; title: string; at: number } | null>(null);
   const [attachMsg, setAttachMsg] = useState("");
+  // The recording service scales to zero when idle: the first start of the day has
+  // to wake it. This is shown as progress, not as an error.
+  const [waking, setWaking] = useState<{ active: boolean; seconds: number }>({ active: false, seconds: 0 });
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamsRef = useRef<MediaStream[]>([]);
@@ -182,6 +185,25 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
     return () => clearInterval(t);
   }, [drain]);
 
+  /** Wake a slept recording service and wait until it answers (max ~75s). */
+  const wakeService = useCallback(async () => {
+    setWaking({ active: true, seconds: 0 });
+    const t = setInterval(() => setWaking((w) => ({ ...w, seconds: w.seconds + 1 })), 1000);
+    try {
+      const res = await fetch("/api/admin/recordings/warm", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.awake) throw new Error(data?.error ?? "خدمة التسجيل لم تستجب");
+    } finally {
+      clearInterval(t);
+      setWaking({ active: false, seconds: 0 });
+    }
+  }, []);
+
+  // Warn about a stalled queue that is really a waking container, not a failure.
+  useEffect(() => {
+    if (upload.failed >= 3 && !waking.active) void wakeService().catch(() => {});
+  }, [upload.failed, waking.active, wakeService]);
+
   // ── start ─────────────────────────────────────────────────────
   const start = async () => {
     setError(null);
@@ -191,6 +213,9 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
     }
     setPhase("starting");
     try {
+      // Make sure a slept service is awake before we create the session, so the
+      // teacher's first lesson of the day does not fail on a cold container.
+      await wakeService();
       const chosen = lessons.find((l) => l.id === lessonId);
       const recTitle = title.trim() || chosen?.title || `تسجيل حصة — ${new Date().toLocaleDateString("ar-JO")}`;
 
@@ -519,9 +544,24 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
 
             {error && <p className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
 
-            <Button size="lg" className="w-full text-base" onClick={start} disabled={phase === "starting" || !canUseService}>
-              {phase === "starting" ? "جارٍ التحضير…" : "🎬 ابدئي التسجيل"}
+            <Button
+              size="lg"
+              className="w-full text-base"
+              onClick={start}
+              disabled={phase === "starting" || waking.active || !canUseService}
+            >
+              {waking.active
+                ? `⏳ نُجهّز خدمة التسجيل… ${waking.seconds}ث`
+                : phase === "starting"
+                  ? "جارٍ التحضير…"
+                  : "🎬 ابدئي التسجيل"}
             </Button>
+            {waking.active && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900">
+                خدمة التسجيل كانت نائمة لتوفير التكلفة، ونوقظها الآن — عادةً تستغرق ١٠–٣٠ ثانية، ولا يمكن أن يبدأ
+                التسجيل قبل أن تجيب. لا تُغلقي الصفحة، وسيصلك تنبيه عند الجهوزية.
+              </p>
+            )}
             <p className="text-center text-[11px] text-gray-500">
               عند المشاركة اختاري «الشاشة كاملة» أو «علامة تبويب» ثم اسمحي بالصوت. الفيديو يُرفع أثناء التسجيل،
               لذلك لا يضيع منك درس بسبب انقطاع.
@@ -575,6 +615,12 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
                 <p className="text-[10px] text-brand-900/60">محاولات إعادة</p>
               </div>
             </div>
+
+            {upload.failed >= 3 && (
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-800">
+                ⏳ خدمة التسجيل كانت نائمة ونوقظها — المقاطع محفوظة عندك وسيُستأنف رفعها تلقائيًا.
+              </p>
+            )}
 
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={togglePause} disabled={phase === "finishing"}>

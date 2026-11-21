@@ -32,7 +32,9 @@ export async function GET() {
       };
       if (!ACTIVE_STATUSES.includes(row.status) || !recordingConfigured()) return { row, labels };
       try {
-        const { state } = await fetchRemoteState(row.serviceId, 4000);
+        // Short timeout, no retries: a sleeping service must not make the list
+        // slow — the DB row is still shown as-is, and the row's own page retries.
+        const { state } = await fetchRemoteState(row.serviceId, 3500);
         return { row: await syncRecording(row, state), labels };
       } catch {
         return { row, labels };
