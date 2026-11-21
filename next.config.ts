@@ -21,6 +21,16 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         headers: [{ key: "Cache-Control", value: "no-store" }],
       },
+      {
+        // The sign-in page must never be served from a cache: a stale bundle is
+        // exactly what made "/login does not work" happen on a phone.
+        source: "/login",
+        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
+      },
+      {
+        source: "/register",
+        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
+      },
     ];
   },
   experimental: {

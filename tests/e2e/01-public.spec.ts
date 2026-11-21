@@ -62,7 +62,7 @@ test.describe("public site", () => {
 
     const sw = await request.get("/sw.js");
     expect(sw.ok()).toBe(true);
-    expect(await sw.text()).toContain("muqriah-v5");
+    expect(await sw.text()).toContain("muqriah-v6");
 
     // private areas must never be indexable
     const off = await page.goto("/offline");

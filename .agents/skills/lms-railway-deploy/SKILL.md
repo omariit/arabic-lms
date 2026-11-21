@@ -71,3 +71,14 @@ the container start command (`prisma migrate deploy`); a schema change needs a d
 - Never seed production. QA (`npm run qa`) is staging-only; production has a read-only smoke
   (`tests/e2e/06-smoke.spec.ts` with `QA_SMOKE=1`).
 - After any deploy, run the production smoke and one real user flow (login → the changed screen).
+
+## Login page regressions (learned the hard way)
+
+- A cached/old client bundle made `/login` look dead: the button only worked after hydration.
+  The page now has a real `<form method="post" action="/api/auth/login-form">` fallback, so it signs
+  in with no JavaScript at all. Never put the password in a GET form again.
+- In route handlers, redirect with a **public** URL. Behind Railway's proxy `req.url` is
+  `http://localhost:PORT/...`; redirecting on it sends the browser to localhost
+  (`ERR_CONNECTION_REFUSED`). Use `x-forwarded-host` / `x-forwarded-proto` (see
+  `src/app/api/auth/login-form/route.ts`).
+- Verify with `node scripts/check-login-nojs.mjs` (normal, `javaScriptEnabled: false`, wrong password).

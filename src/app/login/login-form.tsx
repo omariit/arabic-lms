@@ -11,31 +11,54 @@ import { LangSwitcher } from "@/components/lang-switcher";
 export function LoginForm({
   supportWhatsapp = "",
   stagingBanner = false,
+  initialError = null,
+  initialNext = "",
+  initialExpired = false,
 }: {
   supportWhatsapp?: string;
   stagingBanner?: boolean;
+  initialError?: string | null;
+  initialNext?: string;
+  initialExpired?: boolean;
 }) {
   const [country, setCountry] = useState("JO");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
-  const [expired, setExpired] = useState(false);
+  const [expired, setExpired] = useState(initialExpired);
   // A tap that lands before React hydrates used to submit the raw form (empty
   // fields, or a GET that put the password in the URL). Gate the button instead.
   const [hydrated, setHydrated] = useState(false);
   // Showing the password prevents the most common real-world failure: an Arabic
   // keyboard layout or an unseen trailing space producing a "wrong password".
   const [showPassword, setShowPassword] = useState(false);
+  const [nextPath, setNextPath] = useState(initialNext);
 
-  // Arriving from a dead session (SessionGuard redirect or ?expired=1).
+  // Arriving from a dead session (SessionGuard redirect or ?expired=1) or from the
+  // no-JavaScript form POST (?error=no-account / bad-password / rate / …).
   useEffect(() => {
     setHydrated(true);
     const q = new URLSearchParams(window.location.search);
     if (q.has("expired")) setExpired(true);
+
+    const nextParam = q.get("next");
+    if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")) {
+      setNextPath(nextParam);
+    }
+
+    // Old cached forms (no action attribute) submitted a GET with the password in
+    // the URL. Strip it immediately instead of leaving it in history.
+    if (q.has("password")) {
+      window.history.replaceState({}, "", "/login?expired=0");
+      setError("حدّثي الصفحة (إعادة تحميل) ثم حاولي الدخول من جديد");
+    }
   }, []);
 
   const submit = async (e: React.FormEvent) => {
+    // Without a hydrated handler the browser posts the form natively to
+    // /api/auth/login-form, which redirects with a readable ?error=code.
+    if (!hydrated) return;
     e.preventDefault();
     if (!phone.trim() || !password) return;
     setLoading(true);
@@ -78,9 +101,12 @@ export function LoginForm({
           <form
             onSubmit={submit}
             method="post"
-            action="/login"
+            action="/api/auth/login-form"
             className="space-y-4"
+            data-testid="login-form"
           >
+            <input type="hidden" name="countryCode" value={country} />
+            <input type="hidden" name="next" value={nextPath} />
             <div className="grid min-w-0 grid-cols-[1fr_2fr] gap-2">
               <div className="min-w-0">
                 <Label htmlFor="country">المفتاح</Label>
@@ -94,6 +120,7 @@ export function LoginForm({
                 <Label htmlFor="phone">رقم الهاتف</Label>
                 <Input
                   id="phone"
+                  name="phone"
                   dir="ltr"
                   inputMode="tel"
                   autoComplete="tel"
@@ -118,6 +145,7 @@ export function LoginForm({
               </div>
               <Input
                 id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
                 dir="ltr"
                 autoComplete="current-password"
@@ -137,8 +165,8 @@ export function LoginForm({
               </p>
             )}
             {error && <p className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-600">{error}</p>}
-            <Button type="submit" size="lg" className="w-full" disabled={loading || !hydrated}>
-              {!hydrated ? "…" : loading ? "جارٍ الدخول…" : "دخول"}
+            <Button type="submit" size="lg" className="w-full" disabled={loading}>
+              {loading ? "جارٍ الدخول…" : "دخول"}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm">

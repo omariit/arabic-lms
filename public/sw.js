@@ -4,7 +4,7 @@
  * 2) Web Push: live-class alerts, chat messages, exam grading.
  * 3) Notification click: focus an open window or open the target URL.
  */
-const VERSION = "muqriah-v5";
+const VERSION = "muqriah-v6";
 const APP_SHELL = [
   "/",
   "/offline",
