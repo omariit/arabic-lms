@@ -1,4 +1,8 @@
-# منصة المعلمة — Single-Teacher Arabic LMS (Railway-Ready)
+# مُقْرِئَة — منصة تعلّم قرآن لمعلّمة واحدة (Arabic LMS, Railway-Ready)
+
+> **New here / working with an AI agent?** Read [`docs/PROJECT-MAP.md`](docs/PROJECT-MAP.md) first —
+> one file with the whole architecture, auth rules, data model, flows and commands, so nobody has to
+> read the codebase to get oriented (≈6k tokens instead of ≈250k).
 
 Production-grade, cost-optimized Arabic (RTL, mobile-first) learning management system
 built with **Next.js App Router + TypeScript**, **PostgreSQL + Prisma**, **Socket.io + WebRTC

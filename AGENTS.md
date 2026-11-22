@@ -8,6 +8,18 @@ collection is installed at `.agents/skills/` (15 skills, Agent Skills spec forma
 At the start of EVERY session (and after any compaction), you MUST read
 `.agents/skills/using-superpowers/SKILL.md` and follow it for the whole session.
 
+## Read this first (token budget)
+
+**Do NOT read the codebase to get oriented.** Read `docs/PROJECT-MAP.md` (≈6k tokens, Arabic) — it is the
+single source of truth for: stack, all 32 pages, all 75 API routes, the 30 Prisma models, auth rules,
+live-meeting + recording pipelines, the 14 invariants that were each a real bug, exact commands,
+Railway IDs/URLs, the test map, and copy-paste recipes ("add an admin page", "add an R2 kind", …).
+
+Then open only the files that table names for the change you are making. Supporting detail when
+(and only when) needed: `docs/meetings.md`, `docs/recording.md`, `docs/uploads.md`, `docs/qa.md`,
+`docs/roadmap-100.md`. Keep `docs/PROJECT-MAP.md` accurate — update it in the same commit as any
+structural change (new page/route/model/event/env var/invariant).
+
 ## The rule
 
 **Invoke relevant skills BEFORE any response or action** — including clarifying
