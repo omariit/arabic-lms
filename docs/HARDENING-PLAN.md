@@ -85,3 +85,20 @@
 - إذا لم يتوفر PostgreSQL client أو Docker، يُنفّذ كود الأداة والاختبارات ويظل اختبار restore حاجزًا معلنًا، لا ادعاءً بأنه تم.
 - تفعيل Actions secrets/variables (مثل `DATABASE_URL`, `R2_*`, `JOBS_SECRET`) إعداد على حساب GitHub/Railway لا يمكن إنشاؤه بالكود وحده؛ تُضاف أسماء المتغيرات والتوثيق دون إدراج قيمها في Git.
 - أي بند يحتاج تغيير بيانات حقيقية أو اعتمادًا خارجيًا يتوقف قبل الإجراء، ويُسجل ما يلزم من المالك.
+
+## دليل الإنتاج — 2026-11-22 (نشر `3a0fdd40` بعد `7180b9b`)
+
+- `/api/health` = **200**.
+- `curl -I /login` ⇒ `strict-transport-security: max-age=31536000; includeSubDomains` ✓ (H4 مثبت إنتاجيًا).
+- `logo.webp` يُخدَم إنتاجيًا بحجم **22,358 B** ✓ (H8 مثبت إنتاجيًا).
+- `06-smoke` الإنتاجي يظل **2 skipped** لأنه مصمم ليطلب `SMOKE_TEACHER_PASSWORD` (سر المالك) — فحص الشاشات للمالك.
+
+## ما يتبقى على المالك (خارج الكود)
+
+| الإجراء | المكان | الغرض |
+|---|---|---|
+| `SMOKE_TEACHER_PASSWORD` | GitHub Secret + متغير تشغيل محلي | تشغيل فحص الدخان الإنتاجي |
+| `JOBS_SECRET` + `JOBS_URL` (ستاجنغ ثم إنتاج) | GitHub Secrets (`JOBS_URL` = `https://…/api/internal/jobs`) وعلى الخدمة في Railway | تفعيل نظافة كل ساعة (H6) |
+| `BACKUP_ENCRYPTION_KEY` (64 hex مستقل عن R2) | مخزن أسرار المالك | فك تشفير النسخ الاحتياطية (H1) |
+| PostgreSQL client (pg_dump/pg_restore) أو Docker | الجهاز المحلي | أول نسخة + تجربة استعادة معزولة (H1) |
+| CI: راقب أول تشغيل لـ`ci.yml` | تبويب Actions | تأكيد البوابة الخضراء |
