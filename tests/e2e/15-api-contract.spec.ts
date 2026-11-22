@@ -51,8 +51,10 @@ test.describe("API contract: wrong role", () => {
 
 test.describe("API contract: login form", () => {
   test("native form POST answers 303 and never leaks the password in a URL", async ({ request }) => {
+    // maxRedirects:0 — we assert the contract (the 303 itself), not the followed response.
     const res = await request.post("/api/auth/login-form", {
       form: { phone: "07800000000", password: "definitely-wrong", countryCode: "JO" },
+      maxRedirects: 0,
     });
     expect(res.status()).toBe(303);
     const location = res.headers().location ?? "";

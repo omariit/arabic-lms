@@ -44,7 +44,14 @@
 - بعد: **0 vulnerabilities** (`npm audit --omit=dev`)، `prisma CLI` يعمل، tsc نظيف، **115/115** اختبار وحدة، بناء نظيف.
 - تحديث `package.json`/`package-lock.json` هو التغيير الوحيد الدائم هنا.
 
-### H4 — HSTS — **أُغلق كودًا؛ التحقق النهائي بعد النشر**
+### دليل staging — 2026-11-22 (بعد نشر `209ae0d`)
+- `staging /api/health` = **200**.
+- `curl -I /login` ⇒ `strict-transport-security: max-age=31536000; includeSubDomains` ✓ و`x-frame-options: SAMEORIGIN` ✓.
+- `15-api-contract.spec.ts`: **9/9** (بعد إصلاح المواصفة: `maxRedirects: 0` لأن Playwright كان يتبع 303 ويعيد 200).
+- `06-smoke + 02-auth + 07-studio`: **10 passed · 2 skipped** (skip = شروط إنتاج فقط).
+- وزن الصفحات: `logo.webp` **22,358 B** بدل `logo.png` **161,575 B** (−86%)، و`/login` HTML 19,127 B.
+
+### H4 — HSTS — **أُغلق: أُثبت على staging؛ يُثبَت على الإنتاج بعد النشر**
 - `next.config.ts`: ترويسة `Strict-Transport-Security: max-age=31536000; includeSubDomains` تُضاف فقط عندما `NODE_ENV=production` (يشمل staging والإنتاج؛ dev لا يضعها). بلا `preload` عمدًا.
 
 ### H5 — ESLint + CI — **أُغلق**
