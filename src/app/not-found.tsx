@@ -5,7 +5,7 @@ export default function NotFound() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-[#faf8f2] px-4 text-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo.png" alt="مُقْرِئَة" className="mb-6 h-20 w-auto" />
+      <img src="/logo.webp" alt="مُقْرِئَة" className="mb-6 h-20 w-auto" />
       <p className="font-display text-5xl font-extrabold text-emerald-800 sm:text-6xl">٤٠٤</p>
       <h1 className="mt-3 font-display text-xl font-extrabold text-emerald-950 sm:text-2xl">
         الصفحة غير موجودة

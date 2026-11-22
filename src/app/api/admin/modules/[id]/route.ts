@@ -7,11 +7,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (error) return error;
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as { title?: string; position?: number };
-  const module = await db.module.update({
+  const updated = await db.module.update({
     where: { id },
     data: { ...(body.title ? { title: body.title } : {}), ...(body.position !== undefined ? { position: body.position } : {}) },
   });
-  return NextResponse.json({ module });
+  return NextResponse.json({ module: updated });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

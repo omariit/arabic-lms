@@ -1,0 +1,30 @@
+name: CI
+
+# H5 quality gate: nothing reaches main without types, tests, lint, build and a
+# fresh check that the project map's numbers still match the code.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # The build never talks to the database (all pages are dynamic), but Prisma
+      # validates the URL shape when the client initialises.
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npx vitest run
+      - run: node scripts/map-facts.mjs --check
+      - run: npm run build

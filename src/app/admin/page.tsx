@@ -11,17 +11,30 @@ export default async function AdminDashboard() {
   const user = await requireTeacher();
   const isAdmin = user.role === "ADMIN";
 
-  const [pendingRequests, voiceQueue, recentViolations, activeLives, oauth] = await Promise.all([
+  const [pendingRequests, voiceQueue, recentViolations, activeLives, oauth, teacherProfile] = await Promise.all([
     db.enrollmentRequest.count({ where: { status: "PENDING" } }),
     db.examAttempt.count({ where: { status: "SUBMITTED", exam: { type: "VOICE" } } }),
     db.securityViolation.findMany({ orderBy: { createdAt: "desc" }, take: 5, include: { user: { select: { fullName: true } } } }),
     db.liveSession.findMany({ where: { status: { in: ["LIVE", "SCHEDULED"] } }, include: { course: { select: { title: true } } }, take: 5 }),
     db.teacherOAuthToken.findFirst(),
+    db.teacherProfile.findFirst({ select: { cliqAlias: true, bankHint: true, whatsappNumber: true } }),
   ]);
 
   return (
     <main className="space-y-6">
       <h1 className="sr-only">لوحة {isAdmin ? "الإدارة" : "المعلمة"} — نظرة سريعة</h1>
+      {/* Payment details are required for students to complete manual enrollment. */}
+      {(!teacherProfile?.cliqAlias && !teacherProfile?.bankHint && !teacherProfile?.whatsappNumber) && (
+        <Card role="alert" className="border-amber-300 bg-amber-50">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <p className="text-sm font-bold text-amber-950">بيانات الدفع والتواصل غير مكتملة — قد لا تتمكن الطالبات من إتمام طلب التسجيل.</p>
+            <Link href="/admin/profile" className={cn(buttonVariants({ size: "sm", variant: "secondary" }))}>
+              إكمال الملف الآن
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
       {/* One-click live launcher — the teacher's primary action */}
       <OneClickLauncher youtubeConnected={Boolean(oauth)} />
 

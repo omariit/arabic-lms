@@ -90,7 +90,7 @@ export function LoginForm({
       <Card className="w-full min-w-0">
         <CardContent className="w-full min-w-0 p-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="مُقْرِئَة" className="mx-auto mb-4 h-20 w-auto" />
+          <img src="/logo.webp" width={400} height={322} fetchPriority="high" alt="مُقْرِئَة" className="mx-auto mb-4 h-20 w-auto" />
           {stagingBanner && (
             <p className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-center text-[11px] font-bold text-amber-900">
               بيئة تجريبية (Staging) — الحسابات هنا ليست حسابات الموقع الحقيقي

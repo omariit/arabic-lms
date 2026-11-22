@@ -9,6 +9,7 @@ const APP_SHELL = [
   "/",
   "/offline",
   "/logo.png",
+  "/logo.webp",
   "/logo-square.png",
   "/icon.svg",
   "/mushaf.svg",

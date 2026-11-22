@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   eslint: { ignoreDuringBuilds: true },
   async headers() {
+    // HSTS only where the site is actually served over HTTPS: staging and production
+    // both run behind Railway's TLS, but local dev must never set it (it would pin
+    // localhost to HTTPS in the developer's browser). No `preload` — this domain
+    // is not in the HSTS preload list and shouldn't be submitted to it casually.
+    const tls = process.env.NODE_ENV === "production";
     return [
       {
         source: "/:path*",
@@ -15,6 +20,7 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
+          ...(tls ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }] : []),
         ],
       },
       {

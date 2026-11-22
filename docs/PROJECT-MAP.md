@@ -36,11 +36,11 @@
 server.js              نقطة التشغيل: Next + Socket.io + إنهاء لطيف (SIGTERM)
 prisma/                schema + seed.mjs (أدمن+دورة) + seed-qa.mjs (بيانات الاختبار)
 recording-service/     خدمة مستقلة: استقبال chunks → FFmpeg → MP4 + thumbnail + purge
-src/app/               32 صفحة + 75 مسار API
+src/app/               32 صفحة + 76 مسار API
 src/components/        19 مكوّنًا (أكبرها meeting-room 1360 · board-stage 448 · protected-player 363)
 src/lib/               26 وحدة منطق خالصة (سهلة الاختبار)
 src/hooks/             3 خطافات (use-audio-recorder · use-ice-servers)
-tests/                 16 ملف vitest (104 اختبار) + tests/e2e/ 14 ملف Playwright
+tests/                 18 ملف vitest (115 اختبار) + tests/e2e/ 15 ملف Playwright
 scripts/               أدوات تحقق/فحص (login، ux-audit، pdf-worker)
 docs/                  recording · meetings · uploads · qa · roadmap-100 · TASKS · prompt
 Dockerfile · railway.json   نشر Railway (builder = Dockerfile)
@@ -74,12 +74,12 @@ Dockerfile · railway.json   نشر Railway (builder = Dockerfile)
 
 ---
 
-## ٤. مسارات API (75) — التجميع
+## ٤. مسارات API (76) — التجميع
 
 `/api/auth/*` (login, login-form, logout, register, session) · `/api/admin/*` (لكل كيان CRUD + `inbox`, `recordings/[id]/{finalize,abort,attach}`, `recordings/purge`, `live/[id]/report`) ·
 `/api/lessons/*`, `/api/exams/*`, `/api/live/*`, `/api/chat/*`, `/api/student/*` (enroll-request، voucher) ·
 `/api/r2/{upload,audio}` · `/api/recordings/[id]/{video,thumbnail}` · `/api/video/{token,play}` ·
-`/api/webrtc/ice` · `/api/push` · `/api/health` · `/api/internal/recordings/callback` (من الخدمة إلينا).
+`/api/webrtc/ice` · `/api/push` · `/api/health` · `/api/internal/recordings/callback` (من الخدمة إلينا) · `/api/internal/jobs` (سرّ `JOBS_SECRET`).
 
 **نمط كل مسار محمي:** `const u = await apiUser("ADMIN" | "TEACHER" | "STAFF" | "STUDENT" | "any")`
 → إن فشل يعيد `NextResponse.json({error:"غير مصرح"}, {status: …})`. كل إعادة توجيه تستخدم `publicUrl(req, path)`
@@ -190,10 +190,13 @@ Namespace `/meet`. الأحداث: `meet:join|knock|admitted|roster|signal|media
 ```bash
 npm run dev                 # node server.js (Next + Socket.io)
 npm run build               # prisma generate && next build  (prebuild ينسخ pdf.worker)
-npx vitest run              # 104 اختبار وحدة / 16 ملف
+npx vitest run              # 115 اختبار وحدة / 18 ملف
 node scripts/map-facts.mjs  # حقائق مقيسة (صفحات/مسارات/نماذج/أحداث…) لتحديث هذه الخريطة
 node scripts/map-facts.mjs --check   # يفشل إن كانت أرقام الخريطة لا تطابق الكود
-node scripts/install-prompts.mjs     # يثبّت docs/prompts/*.md كأوامر: /master و /project-map
+node scripts/install-prompts.mjs     # يثبّت docs/prompts/*.md كأوامر: /master و /project-map و /harden
+node scripts/db-backup.mjs --dry-run # يجهّز نسخة مشفرة محليًا دون رفع (يتطلب pg_dump + secrets)
+node scripts/db-backup.mjs --upload # يرفع إلى R2؛ الاحتفاظ dry-run افتراضيًا
+node scripts/db-backup.mjs --upload --apply-retention # يرفع ثم يحذف النسخ الأقدم من 14 يومًا
 node scripts/ux-audit.mjs   # فحص ٣٢ شاشة (موبايل) — يجب أن يعطي 0 findings
 node scripts/check-login-nojs.mjs ; node scripts/check-login-loop.mjs
 QA_SEED=1 node prisma/seed-qa.mjs                              # بيانات الاختبار (staging)
@@ -222,6 +225,7 @@ railway up ./recording-service --path-as-root -e <env> -s recording-service --de
 | `R2_ACCOUNT_ID` `R2_ACCESS_KEY_ID` `R2_SECRET_ACCESS_KEY` `R2_BUCKET_NAME` (`muqriaa`) | الملفات |
 | `GOOGLE_CLIENT_ID` `GOOGLE_CLIENT_SECRET` `NEXT_PUBLIC_APP_URL` | OAuth يوتيوب (**غير مضبوط بعد**) |
 | `RECORDING_SERVICE_URL` `NEXT_PUBLIC_RECORDING_SERVICE_URL` `RECORDING_SHARED_SECRET` | خدمة التسجيل |
+| `JOBS_SECRET` (اختياري) `VOUCHER_GRACE_DAYS` (=90) | مهمة `/api/internal/jobs` الدورية؛ بلا سرّ تبقى 503 |
 
 - **إنتاج:** `https://arabic-lms-production.up.railway.app` · خدمة التسجيل `https://recording-service-production-1c73df77.up.railway.app`
 - **staging:** `https://arabic-lms-staging.up.railway.app` · `https://recording-service-staging.up.railway.app`
@@ -251,7 +255,7 @@ railway up ./recording-service --path-as-root -e <env> -s recording-service --de
 | `12-live-poll` | أسئلة الحصة + تقرير الحضور |
 | `13-meeting-video` | فيديو في الاتجاهين (≥٢ بلاطات لكل جهة) + إنهاء الحصة |
 | `14-homework-voice` | ميكروفون الواجب + سماع المعلمة |
-| `tests/*.test.ts` | ١٠٤ اختبارات وحدة: auth، phone، pricing، crypto، exam-order، polls، rtc-media/stats/send، recording، rate-limit، youtube، uploads |
+| `tests/*.test.ts` | ١١٥ اختبارًا: auth، phone، pricing، crypto، exam-order، polls، rtc-media/stats/send، recording، rate-limit، youtube، uploads، **db-backup (6)**، **jobs (5)** |
 
 ---
 
@@ -284,6 +288,7 @@ railway up ./recording-service --path-as-root -e <env> -s recording-service --de
 
 | البند | الحالة |
 |---|---|
+| **H1 restore** | الأداة جاهزة ومُختبَرة (تشفير/فك/احتفاظ)؛ الحذف النهائي: لا `pg_dump`/`pg_restore`/Docker محليًا ⇒ ثبّتي PostgreSQL client ثم `docs/HARDENING-PLAN.md` §H1 |
 | خادم TURN (coturn) | الكود والبيانات جاهزة؛ لا يوجد خادم ⇒ شبكات مقيّدة قد تفشل |
 | OAuth يوتيوب | يحتاج `GOOGLE_CLIENT_ID/SECRET` من المالك |
 | بروفايل المعلّمة على الإنتاج | فارغ (CliQ/بنك/واتساب) ⇒ صفحة الدفع بلا وجهة |
@@ -300,5 +305,5 @@ railway up ./recording-service --path-as-root -e <env> -s recording-service --de
 - **أي تعديل واجهة**: `npx tsc --noEmit` + `npx vitest run` + إن لمس الحصص/الاستوديو شغّل الـspec المعني على staging.
 - **العربية أولًا** في كل نص جديد (والترجمة في `src/lib/i18n.ts` عبر مفاتيح `dict(locale)`).
 - مهارات المشروع الخاصة: `lms-recording-pipeline` · `lms-railway-deploy` · `lms-qa-playwright`.
-- **برومبتات جاهزة** في `docs/prompts/`: `master.md` (أي مهمة) · `project-map.md` (تحديث الخريطة) · `harden.md` (جولة تحصين H1..H12). ثبّتها كأوامر بـ`node scripts/install-prompts.mjs` ثم `/reload` ⇒ `/master …` و`/project-map`.
-  الخريطة تُدقَّق آليًا: `node scripts/map-facts.mjs --check`.
+- **برومبتات جاهزة** في `docs/prompts/`: `master.md` (أي مهمة) · `project-map.md` (تحديث الخريطة) · `harden.md` (جولة تحصين H1..H12). ثبّتها كأوامر بـ`node scripts/install-prompts.mjs` ثم `/reload` ⇒ `/master …` و`/project-map` و`/harden`. خطة التحصين وسجلها: `docs/HARDENING-PLAN.md`.
+  الخريطة تُدقَّق آليًا: `node scripts/map-facts.mjs --check`. خطة التحصين الحالية: `docs/HARDENING-PLAN.md`.

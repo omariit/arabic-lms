@@ -87,6 +87,8 @@ export function StaffNav({ primary, more }: { primary: StaffNavItem[]; more: Sta
           ))}
           <button
             type="button"
+            aria-haspopup="dialog"
+            aria-expanded={open}
             onClick={() => setOpen(true)}
             className="relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-bold text-brand-900"
           >

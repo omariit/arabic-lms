@@ -132,12 +132,12 @@ async function main() {
         coverColor: c.color,
       },
     });
-    const module = await db.module.create({
+    const firstModule = await db.module.create({
       data: { courseId: course.id, title: "الوحدة الأولى: التأسيس", position: 0 },
     });
     await db.lesson.create({
       data: {
-        moduleId: module.id,
+        moduleId: firstModule.id,
         title: "درس تجريبي مجاني — تعريف بالمنصة وطريقة الإتقان",
         youtubeId: "dQw4w9WgXcQ", // replace with a real lesson ID
         access: "FREE_PREVIEW",

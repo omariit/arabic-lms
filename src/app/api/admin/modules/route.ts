@@ -8,8 +8,8 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { courseId?: string; title?: string; position?: number };
   if (!body.courseId || !body.title?.trim()) return NextResponse.json({ error: "بيانات ناقصة" }, { status: 400 });
   const count = await db.module.count({ where: { courseId: body.courseId } });
-  const module = await db.module.create({
+  const created = await db.module.create({
     data: { courseId: body.courseId, title: body.title.trim(), position: body.position ?? count },
   });
-  return NextResponse.json({ module });
+  return NextResponse.json({ module: created });
 }

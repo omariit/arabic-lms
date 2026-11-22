@@ -892,7 +892,7 @@ export function MeetingRoom({
         </div>
       </div>
 
-      {toast && <div className="rounded-xl bg-brand-700 px-3 py-2 text-center text-xs font-bold text-white">{toast}</div>}
+      {toast && <div role="status" aria-live="polite" className="rounded-xl bg-brand-700 px-3 py-2 text-center text-xs font-bold text-white">{toast}</div>}
 
       {/* stage */}
       <div className={`grid gap-2 ${spotlight ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>

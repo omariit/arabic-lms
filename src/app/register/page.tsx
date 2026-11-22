@@ -46,7 +46,7 @@ export default function RegisterPage() {
       <Card className="w-full min-w-0">
         <CardContent className="w-full min-w-0 p-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="مُقْرِئَة" className="mx-auto mb-4 h-20 w-auto" />
+          <img src="/logo.webp" width={400} height={322} fetchPriority="high" alt="مُقْرِئَة" className="mx-auto mb-4 h-20 w-auto" />
           <h1 className="mb-1 text-center text-2xl font-extrabold">حساب جديد</h1>
           <p className="mb-6 text-center text-sm text-gray-500">اسمك ورقم هاتفك سيظهران كعلامة مائية على الفيديو</p>
           <form onSubmit={submit} className="space-y-4">

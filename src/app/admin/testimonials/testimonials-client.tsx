@@ -83,7 +83,7 @@ export function TestimonialsClient() {
               <div>
                 <p className="text-sm font-extrabold">{t.name} <span className="text-amber-500">{"★".repeat(t.rating)}</span></p>
                 {t.level && <p className="text-[11px] font-bold text-amber-700">{t.level}</p>}
-                <p className="mt-1 text-sm text-gray-600">"{t.text}"</p>
+                <p className="mt-1 text-sm text-gray-600">«{t.text}»</p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <Button size="sm" variant={t.published ? "secondary" : "success"} onClick={() => togglePublish(t)} disabled={busy}>
