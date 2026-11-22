@@ -191,6 +191,9 @@ Namespace `/meet`. الأحداث: `meet:join|knock|admitted|roster|signal|media
 npm run dev                 # node server.js (Next + Socket.io)
 npm run build               # prisma generate && next build  (prebuild ينسخ pdf.worker)
 npx vitest run              # 104 اختبار وحدة / 16 ملف
+node scripts/map-facts.mjs  # حقائق مقيسة (صفحات/مسارات/نماذج/أحداث…) لتحديث هذه الخريطة
+node scripts/map-facts.mjs --check   # يفشل إن كانت أرقام الخريطة لا تطابق الكود
+node scripts/install-prompts.mjs     # يثبّت docs/prompts/*.md كأوامر: /master و /project-map
 node scripts/ux-audit.mjs   # فحص ٣٢ شاشة (موبايل) — يجب أن يعطي 0 findings
 node scripts/check-login-nojs.mjs ; node scripts/check-login-loop.mjs
 QA_SEED=1 node prisma/seed-qa.mjs                              # بيانات الاختبار (staging)
@@ -297,3 +300,6 @@ railway up ./recording-service --path-as-root -e <env> -s recording-service --de
 - **أي تعديل واجهة**: `npx tsc --noEmit` + `npx vitest run` + إن لمس الحصص/الاستوديو شغّل الـspec المعني على staging.
 - **العربية أولًا** في كل نص جديد (والترجمة في `src/lib/i18n.ts` عبر مفاتيح `dict(locale)`).
 - مهارات المشروع الخاصة: `lms-recording-pipeline` · `lms-railway-deploy` · `lms-qa-playwright`.
+- **برومبتات جاهزة** في `docs/prompts/`: `master.md` (أي مهمة: بناء/تطوير/إصلاح/تحليل) و`project-map.md`
+  (تحديث هذه الخريطة). ثبّتها كأوامر بـ`node scripts/install-prompts.mjs` ثم `/reload` ⇒ `/master …` و`/project-map`.
+  الخريطة تُدقَّق آليًا: `node scripts/map-facts.mjs --check`.

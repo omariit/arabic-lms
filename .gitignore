@@ -12,3 +12,7 @@ qa-report/
 test-results/
 playwright-report/
 tests/e2e/.qa-state.json
+
+# agent prompt-template copies (source of truth: docs/prompts/)
+.deepai-code/
+.pi/prompts/
