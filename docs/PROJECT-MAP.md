@@ -300,6 +300,5 @@ railway up ./recording-service --path-as-root -e <env> -s recording-service --de
 - **أي تعديل واجهة**: `npx tsc --noEmit` + `npx vitest run` + إن لمس الحصص/الاستوديو شغّل الـspec المعني على staging.
 - **العربية أولًا** في كل نص جديد (والترجمة في `src/lib/i18n.ts` عبر مفاتيح `dict(locale)`).
 - مهارات المشروع الخاصة: `lms-recording-pipeline` · `lms-railway-deploy` · `lms-qa-playwright`.
-- **برومبتات جاهزة** في `docs/prompts/`: `master.md` (أي مهمة: بناء/تطوير/إصلاح/تحليل) و`project-map.md`
-  (تحديث هذه الخريطة). ثبّتها كأوامر بـ`node scripts/install-prompts.mjs` ثم `/reload` ⇒ `/master …` و`/project-map`.
+- **برومبتات جاهزة** في `docs/prompts/`: `master.md` (أي مهمة) · `project-map.md` (تحديث الخريطة) · `harden.md` (جولة تحصين H1..H12). ثبّتها كأوامر بـ`node scripts/install-prompts.mjs` ثم `/reload` ⇒ `/master …` و`/project-map`.
   الخريطة تُدقَّق آليًا: `node scripts/map-facts.mjs --check`.
