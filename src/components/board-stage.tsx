@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadPages, type Page } from "@/lib/board-pages";
+import { loadPages, pageBitmap, pageBitmapSync, releasePages, type Page } from "@/lib/board-pages";
 
 /**
  * لوحة الشرح — the recording surface of the teaching studio.
@@ -93,7 +93,19 @@ export function BoardStage({
       const dh = vh * scale;
       ctx.drawImage(video, (W - dw) / 2 + p.x, (H - dh) / 2 + p.y, dw, dh);
     } else if (page) {
-      const img = page.canvas;
+      // Pages live as compressed blobs; only a few are decoded at any moment. A page that
+      // is not decoded yet is fetched here and repainted as soon as it is ready.
+      const img = pageBitmapSync(page);
+      if (!img) {
+        void pageBitmap(page).then((bitmap) => {
+          if (bitmap) paintRef.current?.();
+        });
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+        ctx.font = "bold 34px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("… تُجهَّز الصفحة", W / 2, H / 2);
+        ctx.textAlign = "start";
+      } else {
       const base = Math.min(W / img.width, H / img.height);
       const dw = img.width * base * z;
       const dh = img.height * base * z;
@@ -106,6 +118,7 @@ export function BoardStage({
       ctx.fillRect(dx, dy, dw, dh);
       ctx.restore();
       ctx.drawImage(img, dx, dy, dw, dh);
+      }
     } else {
       ctx.fillStyle = "rgba(255,255,255,0.8)";
       ctx.font = "bold 38px system-ui, sans-serif";
@@ -119,16 +132,24 @@ export function BoardStage({
     }
   }, []);
 
+  const paintRef = useRef<(() => void) | null>(null);
+  paintRef.current = paint;
+
   useEffect(() => {
-    const id = window.setInterval(paint, 1000 / 30);
+    // 15fps is enough for slides and a handwriting stroke, and halves the pixels the
+    // encoder has to chew through while a lesson is being recorded.
+    const id = window.setInterval(paint, 1000 / 15);
     return () => window.clearInterval(id);
   }, [paint]);
+
+  // Leaving the studio must not leave decoded pages in memory.
+  useEffect(() => () => releasePages(), []);
 
   // The canvas stream is created once; the studio records it directly.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const stream = canvas.captureStream(30);
+    const stream = canvas.captureStream(15);
     onStreamRef.current(stream);
     return () => {
       stream.getTracks().forEach((t) => t.stop());

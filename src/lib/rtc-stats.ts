@@ -27,6 +27,9 @@ export type PeerSummary = {
   receiving: boolean;
   /** inbound video frames actually decoded since the previous sample */
   framesDecoded: number;
+  /** megabytes this participant moved in/out since the call started */
+  mbIn: number;
+  mbOut: number;
 };
 
 export type Sample = { bytes: number; time: number; frames?: number };
@@ -45,6 +48,8 @@ export const EMPTY_SUMMARY: PeerSummary = {
   codec: null,
   receiving: false,
   framesDecoded: 0,
+  mbIn: 0,
+  mbOut: 0,
 };
 
 /**
@@ -105,6 +110,10 @@ export function summarise(
 
   summary.receiving = inBytes > 0;
   summary.framesDecoded = framesDecoded;
+  // Cumulative totals, not deltas: "how much data did this lesson cost me?" is the
+  // question a student on a mobile plan actually asks.
+  summary.mbIn = Math.round((inBytes / 1048576) * 10) / 10;
+  summary.mbOut = Math.round((outBytes / 1048576) * 10) / 10;
   summary.lossPct = received > 0 ? Math.round((lost / (lost + received)) * 1000) / 10 : null;
 
   const kbps = (cur: number, before: Sample | undefined) => {

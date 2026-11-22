@@ -299,8 +299,10 @@ export function Studio({ canUseService, serviceUrl }: { canUseService: boolean; 
       );
       const recorder = new MediaRecorder(mixed, {
         ...(mime ? { mimeType: mime } : {}),
-        videoBitsPerSecond: 2_500_000,
-        audioBitsPerSecond: 128_000,
+        // A board and a voice: 720p slides stay sharp at ~900 kbps, and 48 kbps mono is
+        // transparent for speech. Smaller files = less client CPU, less volume, less egress.
+        videoBitsPerSecond: 900_000,
+        audioBitsPerSecond: 48_000,
       });
       recorderRef.current = recorder;
 

@@ -70,7 +70,7 @@ export class LiveSessionRecorder {
 
     // 2) video: our composite canvas
     this.paint();
-    const canvasStream = this.canvas.captureStream(25);
+    const canvasStream = this.canvas.captureStream(15);
     const tracks: MediaStreamTrack[] = [...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()];
     this.mixedStream = new MediaStream(tracks);
 
@@ -79,8 +79,8 @@ export class LiveSessionRecorder {
     );
     this.recorder = new MediaRecorder(this.mixedStream, {
       ...(mime ? { mimeType: mime } : {}),
-      videoBitsPerSecond: 2_000_000,
-      audioBitsPerSecond: 96_000,
+      videoBitsPerSecond: 700_000,
+      audioBitsPerSecond: 48_000,
     });
     this.recorder.ondataavailable = (e) => {
       if (!e.data?.size) return;

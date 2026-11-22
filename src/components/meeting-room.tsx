@@ -9,6 +9,7 @@ import { LiveSessionRecorder } from "@/lib/live-recorder";
 import { useIceServers } from "@/hooks/use-ice-servers";
 import { AttendanceCard, LivePollCard, PollResultsCard, type ActivePoll, type AttendanceData, type PollProgress } from "@/components/live-poll";
 import { hasLiveVideo, pickVideoStream } from "@/lib/rtc-media";
+import { SEND_PROFILES, sendParametersFor, type SendKind } from "@/lib/rtc-send";
 import { EMPTY_SUMMARY, QUALITY_LABEL, qualityOf, summarise, type PeerSummary } from "@/lib/rtc-stats";
 
 /**
@@ -134,6 +135,24 @@ export function MeetingRoom({
     setTimeout(() => setToast((t) => (t === msg ? "" : t)), 3200);
   }, []);
 
+  /**
+   * Cap what this participant sends. The encoder obeys `maxBitrate`, and `contentHint`
+   * tells it how to spend the bits: a page of Arabic text (detail) keeps resolution,
+   * a face (motion) is allowed to soften. Roughly halves a lesson's mobile data.
+   */
+  const tuneSender = useCallback((sender: RTCRtpSender | null, kind: SendKind) => {
+    if (!sender) return;
+    const profile = SEND_PROFILES[kind];
+    try {
+      if (sender.track) sender.track.contentHint = profile.contentHint;
+    } catch { /* older browsers ignore contentHint */ }
+    try {
+      const current = sender.getParameters();
+      if (!current.encodings?.length) current.encodings = [{}];
+      void sender.setParameters({ ...current, ...sendParametersFor(kind, current) } as RTCRtpSendParameters).catch(() => {});
+    } catch { /* not negotiated yet — applyTracks runs again after negotiation */ }
+  }, []);
+
   /** Push the current local tracks into every peer connection (ref-based, never stale). */
   const applyTracks = useCallback(() => {
     const want = mediaRef.current;
@@ -143,9 +162,9 @@ export function MeetingRoom({
     for (const [peerId, pc] of pcs.current) {
       const s = senders.current.get(peerId);
       if (!s) continue;
-      s.audio?.replaceTrack(want.mic ? micTrack : null).catch(() => {});
-      s.cam?.replaceTrack(want.cam ? camTrack : null).catch(() => {});
-      s.screen?.replaceTrack(want.screen ? screenTrack : null).catch(() => {});
+      s.audio?.replaceTrack(want.mic ? micTrack : null).then(() => tuneSender(s.audio, "audio")).catch(() => {});
+      s.cam?.replaceTrack(want.cam ? camTrack : null).then(() => tuneSender(s.cam, "cam")).catch(() => {});
+      s.screen?.replaceTrack(want.screen ? screenTrack : null).then(() => tuneSender(s.screen, "screen")).catch(() => {});
       // A transceiver negotiated without a track can be stuck at recvonly; flip it and
       // renegotiate so the track actually travels.
       let needsOffer = false;
@@ -236,6 +255,9 @@ export function MeetingRoom({
         cam: pc.getSenders()[1] ?? null,
         screen: pc.getSenders()[2] ?? null,
       });
+      tuneSender(pc.getSenders()[0] ?? null, "audio");
+      tuneSender(pc.getSenders()[1] ?? null, "cam");
+      tuneSender(pc.getSenders()[2] ?? null, "screen");
       void (async () => {
         try {
           const offer = await pc.createOffer();
@@ -421,6 +443,9 @@ export function MeetingRoom({
               cam: pc.getSenders()[1] ?? null,
               screen: pc.getSenders()[2] ?? null,
             });
+            tuneSender(pc.getSenders()[0] ?? null, "audio");
+            tuneSender(pc.getSenders()[1] ?? null, "cam");
+            tuneSender(pc.getSenders()[2] ?? null, "screen");
             applyTracks();
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
@@ -583,15 +608,8 @@ export function MeetingRoom({
     try {
       const stream = await navigator.mediaDevices.getUserMedia(
         kind === "mic"
-          ? { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }
-          : {
-              video: {
-                width: { ideal: 960, max: 1280 },
-                height: { ideal: 540, max: 720 },
-                frameRate: { ideal: 24, max: 30 },
-                facingMode: "user",
-              },
-            },
+          ? { audio: SEND_PROFILES.audio.capture }
+          : { video: { ...(SEND_PROFILES.cam.capture as MediaTrackConstraints), facingMode: "user" } },
       );
       local.current[kind] = stream;
       return stream;
@@ -660,7 +678,7 @@ export function MeetingRoom({
     }
     if (viewer.isGuest) { flash("مشاركة الشاشة للمسجّلات فقط"); return; }
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: SEND_PROFILES.screen.capture, audio: false });
       local.current.screen = stream;
       stream.getVideoTracks()[0].onended = () => {
         mediaRef.current.screen = false;
@@ -1170,6 +1188,11 @@ export function MeetingRoom({
                           {st?.fps ? ` · ${st.fps}fps` : ""}
                           {st?.candidate ? ` · ${st.candidate}` : ""}
                         </p>
+                        {(st?.mbIn ?? 0) > 0 || (st?.mbOut ?? 0) > 0 ? (
+                          <p className="text-[9px] text-brand-900/45" dir="ltr">
+                            {st?.mbIn ?? 0} MB ↓ · {st?.mbOut ?? 0} MB ↑
+                          </p>
+                        ) : null}
                       </li>
                     );
                   })}

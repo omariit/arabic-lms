@@ -10,10 +10,73 @@
  * explaining (layout fidelity of PowerPoint is not worth shipping a renderer for).
  */
 
+/**
+ * A page is stored as a compressed image, not a live canvas.
+ *
+ * A 1600×1131 canvas costs 7.2 MB of RAM; a forty-slide deck would hold 290 MB for no
+ * reason (the recording canvas is 1280×720). Pages are kept as JPEG/WebP blobs (a few
+ * hundred KB each) and decoded on demand into a small LRU, so a long deck stays cheap
+ * on a phone.
+ */
 export type Page = {
-  canvas: HTMLCanvasElement;
   label: string;
+  width: number;
+  height: number;
+  source: Blob;
 };
+
+const DECODED_LIMIT = 3;
+const decoded = new Map<Page, ImageBitmap>();
+
+/** The decoded bitmap for a page, if it is currently in memory. */
+export function pageBitmapSync(page: Page | undefined): ImageBitmap | null {
+  if (!page) return null;
+  return decoded.get(page) ?? null;
+}
+
+/** Decode a page (async) and keep it in a small LRU of live bitmaps. */
+export async function pageBitmap(page: Page): Promise<ImageBitmap | null> {
+  const hit = decoded.get(page);
+  if (hit) {
+    // refresh LRU position
+    decoded.delete(page);
+    decoded.set(page, hit);
+    return hit;
+  }
+  const bitmap = await createImageBitmap(page.source).catch(() => null);
+  if (!bitmap) return null;
+  decoded.set(page, bitmap);
+  while (decoded.size > DECODED_LIMIT) {
+    const oldest = decoded.keys().next().value as Page | undefined;
+    if (!oldest) break;
+    const old = decoded.get(oldest);
+    decoded.delete(oldest);
+    old?.close();
+  }
+  return bitmap;
+}
+
+/** Free every decoded page (leaving the studio should not leak memory). */
+export function releasePages(pages: Page[] = []) {
+  for (const page of [...decoded.keys()]) {
+    if (pages.length && !pages.includes(page)) continue;
+    decoded.get(page)?.close();
+    decoded.delete(page);
+  }
+}
+
+/** Canvas → stored page. The canvas backing store is freed immediately after encoding. */
+async function toPage(canvas: HTMLCanvasElement, label: string): Promise<Page> {
+  const width = canvas.width;
+  const height = canvas.height;
+  const blob =
+    (await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.92))) ??
+    (await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9)));
+  // Release the pixels now: keeping forty canvases alive is what made the studio heavy.
+  canvas.width = 0;
+  canvas.height = 0;
+  return { label, width, height, source: blob ?? new Blob([]) };
+}
 
 const PAGE_W = 1600;
 const PAGE_H = 1131; // A4 landscape-ish ratio; images keep their own ratio
@@ -49,6 +112,7 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 }
 
 async function imagePage(file: File | Blob): Promise<Page> {
+  // built as a canvas below, then compressed by toPage
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.src = url;
@@ -56,7 +120,7 @@ async function imagePage(file: File | Blob): Promise<Page> {
   const c = newCanvas(img.naturalWidth || PAGE_W, img.naturalHeight || PAGE_H);
   c.getContext("2d")?.drawImage(img, 0, 0, c.width, c.height);
   URL.revokeObjectURL(url);
-  return { canvas: c, label: "صورة" };
+  return toPage(c, "صورة");
 }
 
 /** Lazy-load pdf.js only when a PDF is actually opened. */
@@ -76,7 +140,7 @@ async function pdfPages(file: File): Promise<Page[]> {
     if (!ctx) continue;
     paperBackground(ctx, canvas.width, canvas.height);
     await page.render({ canvas, canvasContext: ctx, viewport }).promise;
-    pages.push({ canvas, label: `${i}` });
+    pages.push(await toPage(canvas, `${i}`));
   }
   return pages;
 }
@@ -142,14 +206,14 @@ async function pptxSlides(file: File): Promise<Page[]> {
         y += 66;
       }
     }
-    pages.push({ canvas, label: String(pages.length + 1) });
+    pages.push(await toPage(canvas, String(pages.length + 1)));
   }
   return pages;
 }
 
 /** Typeset the extracted Word blocks onto pages. */
-function renderDoc(blocks: DocBlock[]): Page[] {
-  const pages: Page[] = [];
+async function renderDoc(blocks: DocBlock[]): Promise<Page[]> {
+  const canvases: HTMLCanvasElement[] = [];
   let canvas = newCanvas();
   let ctx = canvas.getContext("2d")!;
   let y = 110;
@@ -162,7 +226,7 @@ function renderDoc(blocks: DocBlock[]): Page[] {
     ctx.textAlign = "right";
     y = 110;
   };
-  const push = () => pages.push({ canvas, label: String(pages.length + 1) });
+  const push = () => canvases.push(canvas);
 
   startPage();
   for (const block of blocks) {
@@ -188,6 +252,8 @@ function renderDoc(blocks: DocBlock[]): Page[] {
     y += block.kind === "p" ? 16 : 26;
   }
   push();
+  const pages: Page[] = [];
+  for (const [i, element] of canvases.entries()) pages.push(await toPage(element, String(i + 1)));
   return pages;
 }
 
@@ -199,7 +265,7 @@ export async function loadPages(file: File): Promise<LoadResult> {
   try {
     if (file.type.startsWith("image/")) return { pages: [await imagePage(file)] };
     if (file.type === "application/pdf" || name.endsWith(".pdf")) return { pages: await pdfPages(file) };
-    if (name.endsWith(".docx")) return { pages: renderDoc(await docxBlocks(file)) };
+    if (name.endsWith(".docx")) return { pages: await renderDoc(await docxBlocks(file)) };
     if (name.endsWith(".pptx")) return { pages: await pptxSlides(file) };
     return {
       pages: [],
