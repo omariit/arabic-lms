@@ -164,6 +164,22 @@ function sessionAccess(req, url, sessionId, kinds = ["upload", "view", "control"
   return { via: "token", ...payload };
 }
 
+/** Total bytes under a directory (used by the purge report). */
+async function dirSize(dir) {
+  let total = 0;
+  const stack = [dir];
+  while (stack.length) {
+    const current = stack.pop();
+    const entries = await fs.readdir(current, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else total += (await fileSize(full).catch(() => 0));
+    }
+  }
+  return total;
+}
+
 // ───────────────────────────── http helpers ─────────────────────────────
 function json(res, status, body) {
   const data = JSON.stringify(body);
@@ -418,7 +434,7 @@ const routes = [
     service: "recording-service",
     version: CONFIG.version,
     status: "ok",
-    docs: "/health, POST /sessions, PUT /sessions/:id/chunks/:index, POST /sessions/:id/finalize, GET /sessions/:id, GET /sessions/:id/video.mp4, GET /sessions/:id/thumbnail.jpg",
+    docs: "/health, POST /maintenance/purge, POST /sessions, PUT /sessions/:id/chunks/:index, POST /sessions/:id/finalize, GET /sessions/:id, GET /sessions/:id/video.mp4, GET /sessions/:id/thumbnail.jpg",
   })],
 
   ["GET", /^\/health$/, async (_req, res) => {
@@ -603,6 +619,30 @@ const routes = [
     await removeSession(id);
     log(`session ${id} deleted`);
     return json(res, 200, { ok: true });
+  }],
+
+  // Operator maintenance: drop session/output folders the app no longer knows about.
+  // Recordings deleted from the UI leave their bytes behind (or a volume wipe leaves the
+  // app rows behind); both waste paid volume storage, so the app sends the keep-list.
+  ["POST", /^\/maintenance\/purge$/, async (req, res) => {
+    if (!secretOk(req)) return json(res, 401, { error: "unauthorized" });
+    const body = await readJson(req);
+    const keep = new Set(Array.isArray(body.keep) ? body.keep.map(String) : []);
+    let removed = 0;
+    let freedBytes = 0;
+    for (const base of [SESSIONS, OUTPUTS]) {
+      const entries = await fs.readdir(base).catch(() => []);
+      for (const name of entries) {
+        if (keep.has(name) || jobs.has(name)) continue;
+        const dir = path.join(base, name);
+        freedBytes += await dirSize(dir);
+        await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+        stateCache.delete(name);
+        removed += 1;
+      }
+    }
+    log(`purge: removed ${removed} folders, freed ${freedBytes} bytes`);
+    return json(res, 200, { ok: true, removed, freedBytes });
   }],
 
   ["POST", /^\/tokens\/([A-Za-z0-9_-]{6,64})$/, async (req, res, id) => {

@@ -62,6 +62,32 @@ export async function joinStreamChunks(chunkFiles, targetFile) {
 }
 
 /**
+ * Encoding profile. Recordings are slides, a board and a voice — they do not need a
+ * cinema master. `ultrafast` + CRF 30 + 720p/20fps costs roughly a fifth of the CPU of
+ * the old `veryfast`/CRF 24/1280 profile, and memory follows the resolution.
+ */
+const CHEAP_VIDEO = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-pix_fmt", "yuv420p", "-vf", "scale='min(1280,iw)':-2,fps=20", "-threads", "2"];
+const CHEAP_AUDIO = ["-c:a", "aac", "-b:a", "96k", "-ac", "2", "-ar", "48000"];
+
+/** Is this already H.264 inside an MP4 container (so a copy is enough)? */
+export function alreadyH264(head) {
+  if (!looksLikeStandaloneMp4(head)) return false;
+  const text = head.toString("latin1");
+  return text.includes("avc1") || text.includes("avc3");
+}
+
+/** Concat with `-c copy` — seconds of work instead of a full re-encode. */
+async function concatCopy(files, listFile, final) {
+  const lines = files.map((f) => `file '${f.replace(/'/g, "'\\''")}'`);
+  await fs.writeFile(listFile, lines.join("\n") + "\n", "utf8");
+  await run("ffmpeg", [
+    "-y", "-hide_banner", "-loglevel", "error",
+    "-f", "concat", "-safe", "0", "-i", listFile,
+    "-c", "copy", "-movflags", "+faststart", final,
+  ]);
+}
+
+/**
  * Progressive pipeline:
  *  1. probe the joined stream (duration = progress denominator)
  *  2. transcode to a web-friendly H.264/AAC MP4 with faststart, reporting progress
@@ -97,17 +123,19 @@ export async function processSession({ sessionDir, outputDir, onStage, onProgres
     duration = (await probeDuration(joinedRaw)) ?? 0;
 
     onStage?.("transcode", 5);
-    const args = [
-      "-y", "-hide_banner", "-loglevel", "error",
-      "-i", joinedRaw,
-      "-map", "0:v:0?", "-map", "0:a:0?",
-      "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
-      "-pix_fmt", "yuv420p", "-vf", "scale='min(1280,iw)':-2",
-      "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-ar", "48000",
-      "-movflags", "+faststart",
-      "-progress", "pipe:1", "-nostats",
-      final,
-    ];
+    const copyable = alreadyH264(await fs.readFile(files[0]).then((b) => b.subarray(0, 4096)).catch(() => null));
+    const args = copyable
+      ? ["-y", "-hide_banner", "-loglevel", "error", "-i", joinedRaw, "-c", "copy", "-movflags", "+faststart", final]
+      : [
+          "-y", "-hide_banner", "-loglevel", "error",
+          "-i", joinedRaw,
+          "-map", "0:v:0?", "-map", "0:a:0?",
+          ...CHEAP_VIDEO,
+          ...CHEAP_AUDIO,
+          "-movflags", "+faststart",
+          "-progress", "pipe:1", "-nostats",
+          final,
+        ];
     await run("ffmpeg", args, {
       onStderr: (text) => {
         const seconds = progressSeconds(text);
@@ -120,29 +148,49 @@ export async function processSession({ sessionDir, outputDir, onStage, onProgres
     await fs.rm(joinedRaw, { force: true });
   } else {
     onStage?.("normalize", 2);
-    const listLines = [];
-    for (let i = 0; i < files.length; i++) {
-      const seg = path.join(tempDir, `seg-${String(i).padStart(5, "0")}.mp4`);
-      await run("ffmpeg", [
-        "-y", "-hide_banner", "-loglevel", "error",
-        "-i", files[i],
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
-        "-pix_fmt", "yuv420p", "-vf", "scale='min(1280,iw)':-2",
-        "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-ar", "48000",
-        seg,
-      ]);
-      listLines.push(`file '${seg.replace(/'/g, "'\\''")}'`);
-      onProgress?.(2 + ((i + 1) / files.length) * 88);
+    // Every segment came out of one MediaRecorder with the same encoder settings, so a
+    // plain copy-concat is usually enough — that is the difference between seconds of CPU
+    // and re-encoding the whole lesson. Duration is the check: if the result drifts, we
+    // fall back to the normalising re-encode below.
+    const expected = (await Promise.all(files.map((f) => probeDuration(f)))).reduce((a, b) => a + (b ?? 0), 0);
+    let copied = false;
+    if (files.length > 1 || expected > 0) {
+      try {
+        await concatCopy(files, path.join(tempDir, "list-copy.txt"), final);
+        const got = (await probeDuration(final)) ?? 0;
+        copied = got > 0 && (expected === 0 || Math.abs(got - expected) / Math.max(1, expected) < 0.03);
+        if (!copied) log?.(`copy-concat rejected: expected ${expected}s got ${got}s`);
+      } catch (e) {
+        log?.(`copy-concat failed: ${e instanceof Error ? e.message : e}`);
+        copied = false;
+      }
     }
-    const listFile = path.join(tempDir, "list.txt");
-    await fs.writeFile(listFile, `${listLines.join("\n")}\n`, "utf8");
-    onStage?.("concat", 90);
-    await run("ffmpeg", [
-      "-y", "-hide_banner", "-loglevel", "error",
-      "-f", "concat", "-safe", "0", "-i", listFile,
-      "-c", "copy", "-movflags", "+faststart", final,
-    ]);
-    duration = (await probeDuration(final)) ?? 0;
+    if (copied) {
+      duration = (await probeDuration(final)) ?? 0;
+      onProgress?.(90);
+      onStage?.("concat", 90);
+    } else {
+      const segments = [];
+      const listLines = [];
+      for (let i = 0; i < files.length; i++) {
+        const seg = path.join(tempDir, `seg-${String(i).padStart(5, "0")}.mp4`);
+        await run("ffmpeg", [
+          "-y", "-hide_banner", "-loglevel", "error",
+          "-i", files[i],
+          ...CHEAP_VIDEO,
+          ...CHEAP_AUDIO,
+          seg,
+        ]);
+        segments.push(seg);
+        listLines.push(`file '${seg.replace(/'/g, "'\\''")}'`);
+        onProgress?.(2 + ((i + 1) / files.length) * 88);
+      }
+      const listFile = path.join(tempDir, "list.txt");
+      await fs.writeFile(listFile, listLines.join("\n") + "\n", "utf8");
+      onStage?.("concat", 90);
+      await concatCopy(segments, listFile, final);
+      duration = (await probeDuration(final)) ?? 0;
+    }
   }
 
   onStage?.("thumbnail", 96);

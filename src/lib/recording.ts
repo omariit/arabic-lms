@@ -209,6 +209,22 @@ export async function syncRecording(row: RecordingSession, remote: RemoteState):
   return db.recordingSession.update({ where: { id: row.id }, data: next });
 }
 
+/**
+ * Drop session/output folders the app no longer references.
+ *
+ * Two ways bytes get orphaned: a recording deleted from the UI (the service removes it
+ * best-effort, and a failed call leaves the folder), and a volume wipe (bytes gone, rows
+ * still there → the row must go too, which the caller decides). Either way the volume is
+ * paid storage, so maintenance is one explicit call with the keep-list.
+ */
+export async function purgeOrphanRecordings(keep: string[]): Promise<{ removed: number; freedBytes: number }> {
+  return call<{ removed: number; freedBytes: number }>(
+    "/maintenance/purge",
+    { method: "POST", body: JSON.stringify({ keep }) },
+    { timeoutMs: 120_000, retries: 2, retryDelayMs: 2000 },
+  );
+}
+
 export const ACTIVE_STATUSES: RecordingStatus[] = ["RECORDING", "UPLOADING", "PROCESSING"];
 export const okStatus = (status: RecordingStatus) => status === "READY";
 
